@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>活动报名签到 - 创建活动</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📋 活动报名签到</h1>
+    <div class="sub">创建活动 → 发报名链接 → 现场扫码签到</div>
+  </div>
+
+  <div class="card" id="createCard">
+    <h2>创建活动</h2>
+    <div class="msg" id="msg"></div>
+    <div class="field">
+      <label>活动名称 *</label>
+      <input id="fName" maxlength="60" placeholder="如：周六羽毛球局 / 第 12 期读书会">
+    </div>
+    <div class="field">
+      <label>活动时间 *</label>
+      <input id="fTime" type="datetime-local">
+    </div>
+    <div class="field">
+      <label>活动地点</label>
+      <input id="fLocation" maxlength="120" placeholder="如：社区活动中心 3 楼">
+    </div>
+    <div class="field">
+      <label>活动简介</label>
+      <textarea id="fDesc" rows="3" maxlength="500" placeholder="补充说明（可选）"></textarea>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>名额 *</label>
+        <input id="fCapacity" type="number" min="1" max="100000" value="30">
+      </div>
+      <div class="field">
+        <label>管理 PIN *</label>
+        <input id="fPin" type="password" inputmode="numeric" maxlength="8" placeholder="6-8 位数字">
+        <div class="hint">管理签到时输入，别告诉报名者</div>
+      </div>
+    </div>
+    <button class="btn" id="btnCreate">创建活动</button>
+  </div>
+
+  <div class="card hidden" id="doneCard">
+    <h2>🎉 创建成功</h2>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:14px">
+      把「报名链接」发到群里；「管理链接」自己保存好（含管理密钥，别外传）。
+    </p>
+    <label style="font-size:13px;color:var(--muted)">报名链接（发群里）</label>
+    <div class="link-box">
+      <span class="url" id="signupUrl"></span>
+      <button id="copySignup">复制</button>
+    </div>
+    <label style="font-size:13px;color:var(--muted)">管理链接（自己保存）</label>
+    <div class="link-box">
+      <span class="url" id="manageUrl"></span>
+      <button id="copyManage">复制</button>
+    </div>
+    <div class="qr-box">
+      <div id="qrcode"></div>
+      <div class="qr-tip">报名链接二维码，可直接投屏/打印</div>
+    </div>
+    <div style="height:14px"></div>
+    <a id="goManage" class="btn secondary" href="#">进入管理页</a>
+  </div>
+
+  <div class="footer">Cloudflare Pages + Functions + D1</div>
+</div>
+
+<script src="/vendor/qrcode.min.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/create.js"></script>
+</body>
+</html>

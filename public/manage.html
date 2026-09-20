@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>活动管理</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="container">
+  <!-- PIN 登录 -->
+  <div class="card" id="loginCard">
+    <h2>🔐 组织者登录</h2>
+    <div class="msg" id="loginMsg"></div>
+    <div class="field">
+      <label>管理 PIN</label>
+      <input id="fPin" type="password" inputmode="numeric" maxlength="8" placeholder="创建活动时设置的 6-8 位数字">
+    </div>
+    <button class="btn" id="btnLogin">登录</button>
+  </div>
+
+  <!-- 管理主界面 -->
+  <div id="mainArea" class="hidden">
+    <div class="card">
+      <h2 id="evName"></h2>
+      <div class="meta-row"><span class="icon">🕐</span><span id="evTime"></span></div>
+      <div class="meta-row" id="evLocRow" style="display:none"><span class="icon">📍</span><span id="evLoc"></span></div>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="fill" id="fill"></div></div>
+        <div class="progress-text"><span id="takenText"></span><span id="closedText"></span></div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card"><div class="num" id="stTotal">0</div><div class="lbl">报名</div></div>
+      <div class="stat-card green"><div class="num" id="stChecked">0</div><div class="lbl">已签到</div></div>
+      <div class="stat-card"><div class="num" id="stUnchecked">0</div><div class="lbl">未签到</div></div>
+    </div>
+
+    <div class="tabs">
+      <button id="tabScan" class="active">📷 扫码签到</button>
+      <button id="tabList">📃 名单</button>
+    </div>
+
+    <!-- 扫码面板 -->
+    <div id="panelScan">
+      <div class="card">
+        <div class="scanner-wrap hidden" id="scannerWrap">
+          <video id="video" playsinline muted></video>
+        </div>
+        <div class="scanner-result" id="scanResult"></div>
+        <div style="height:12px"></div>
+        <button class="btn" id="btnToggleScan">开启摄像头扫码</button>
+        <div class="field" style="margin-top:16px">
+          <label>手动补签（输入报名者手机号）</label>
+          <div class="row">
+            <input id="fManualPhone" type="tel" maxlength="20" placeholder="手机号">
+            <button class="btn small" id="btnManual" style="flex:0 0 auto">签到</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 名单面板 -->
+    <div id="panelList" class="hidden">
+      <div class="toolbar">
+        <button class="btn secondary" id="btnRefresh">刷新</button>
+        <button class="btn secondary" id="btnExport">导出 CSV</button>
+        <button class="btn secondary" id="btnClose">截止报名</button>
+      </div>
+      <div class="card">
+        <ul class="signup-list" id="list"></ul>
+        <div class="empty hidden" id="emptyTip">还没有人报名</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty hidden" id="badLink">管理链接无效（缺少 key 或活动不存在）</div>
+
+  <div class="footer">活动报名签到 · 管理端</div>
+</div>
+
+<script src="/vendor/jsQR.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/manage.js"></script>
+</body>
+</html>
