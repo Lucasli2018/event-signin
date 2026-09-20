@@ -1,0 +1,261 @@
+// 端到端探针：真实 HTTP 打通「创建活动 → 报名 → PIN 登录 → 扫码签到 → 撤销 → 导出 → 截止」
+// 用法：
+//   node scripts/probe-e2e.mjs                          # 打线上 https://event-signin.pages.dev
+//   BASE=http://localhost:8788 node scripts/probe-e2e.mjs
+//   TOKEN_FILE=.tmp-token node scripts/probe-e2e.mjs     # 附带清理测试数据（需 D1 编辑权限）
+//
+// 退出码非 0 表示有用例失败。
+const BASE = (process.env.BASE || "https://event-signin.pages.dev").replace(/\/$/, "");
+const ACCT = process.env.CLOUDFLARE_ACCOUNT_ID || "332b848d9f5d9ec2808bdb855763eb8e";
+
+// 本机无 IPv6 出口，而 *.pages.dev 同时返回 AAAA/A 记录 → undici 优先 IPv6 会连接超时。
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
+
+const TIMEOUT_MS = Number(process.env.REQ_TIMEOUT_MS || 30000);
+
+let pass = 0, fail = 0;
+const fails = [];
+function ck(name, cond, extra = "") {
+  if (cond) { pass++; console.log(`  ok   ${name}`); }
+  else { fail++; fails.push(name); console.log(`  FAIL ${name} ${extra}`); }
+}
+
+async function req(method, path, body, headers = {}) {
+  const opts = {
+    method,
+    headers: { ...(body ? { "content-type": "application/json" } : {}), ...headers },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  };
+  let r;
+  for (let i = 0; i < 3; i++) {
+    try { r = await fetch(`${BASE}${path}`, opts); break; }
+    catch (e) { if (i === 2) throw e; await new Promise(s => setTimeout(s, 1000 * (i + 1))); }
+  }
+  const text = await r.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch { /* 非 JSON（CSV 等） */ }
+  return { status: r.status, json, text, headers: r.headers };
+}
+
+const stamp = Date.now().toString(36);
+const NAME = `[E2E] 探针活动 ${stamp}`;
+const PIN = "246813";
+
+console.log(`base: ${BASE}`);
+let eventId = null;
+
+// ---------- 1. 不存在的活动 → 404 ----------
+console.log("\n[1] 404 与 Functions 生效");
+{
+  const r = await req("GET", "/api/events/deadbeef00");
+  ck("未知活动返回 404", r.status === 404, `got ${r.status}`);
+}
+
+// ---------- 2. 创建活动 ----------
+console.log("\n[2] 创建活动");
+{
+  const r = await req("POST", "/api/events", {
+    name: NAME, event_time: "2026-10-01 14:30", location: "深圳南山",
+    description: "端到端探针", capacity: 2, pin: PIN,
+  });
+  ck("创建返回 201", r.status === 201, `got ${r.status} ${r.text.slice(0, 120)}`);
+  const d = r.json || {};
+  ck("返回 10 位 hex id", /^[0-9a-f]{10}$/.test(d.id || ""), d.id);
+  ck("返回 32 位 admin_key", /^[0-9a-f]{32}$/.test(d.admin_key || ""), d.admin_key);
+  ck("signup_path 正确", d.signup_path === `/e.html?id=${d.id}`);
+  eventId = d.id;
+  globalThis.__key = d.admin_key;
+}
+if (!eventId) { console.log("\n创建失败，后续跳过"); process.exit(1); }
+
+// ---------- 3. 参数校验 ----------
+console.log("\n[3] 创建参数校验");
+{
+  const bad = await req("POST", "/api/events", { name: "x", event_time: "2026-10-01 14:30", capacity: 5, pin: "123456" });
+  ck("名称过短被拒", bad.status === 400, `got ${bad.status}`);
+  const bad2 = await req("POST", "/api/events", { name: "探针活动", event_time: "2026/10/01", capacity: 5, pin: "123456" });
+  ck("时间格式非法被拒", bad2.status === 400, `got ${bad2.status}`);
+  const bad3 = await req("POST", "/api/events", { name: "探针活动", event_time: "2026-10-01 14:30", capacity: 5, pin: "12" });
+  ck("PIN 位数非法被拒", bad3.status === 400, `got ${bad3.status}`);
+}
+
+// ---------- 4. 公开信息 ----------
+console.log("\n[4] 活动公开信息");
+{
+  const r = await req("GET", `/api/events/${eventId}`);
+  ck("返回 200", r.status === 200, `got ${r.status}`);
+  ck("remaining = capacity", r.json?.remaining === 2, JSON.stringify(r.json));
+  ck("不泄露 admin_key", !("admin_key" in (r.json || {})), Object.keys(r.json || {}).join(","));
+  ck("不泄露 pin_hash", !("pin_hash" in (r.json || {})));
+}
+
+// ---------- 5. 报名 ----------
+console.log("\n[5] 报名");
+let signupToken = null, signupId = null;
+{
+  const r = await req("POST", `/api/events/${eventId}/signup`, { name: "张三", phone: "13800001111" });
+  ck("首次报名 201", r.status === 201, `got ${r.status} ${r.text.slice(0, 120)}`);
+  ck("返回 32 位签到 token", /^[0-9a-f]{32}$/.test(r.json?.token || ""), r.json?.token);
+  signupToken = r.json?.token;
+
+  const dup = await req("POST", `/api/events/${eventId}/signup`, { name: "张三", phone: "13800001111" });
+  ck("同号重复报名幂等返回原码", dup.status === 200 && dup.json?.duplicated === true && dup.json?.token === signupToken,
+    `got ${dup.status} ${dup.text.slice(0, 120)}`);
+
+  const bad = await req("POST", `/api/events/${eventId}/signup`, { name: "李四", phone: "abc" });
+  ck("非法手机号被拒", bad.status === 400, `got ${bad.status}`);
+
+  const after = await req("GET", `/api/events/${eventId}`);
+  ck("taken 递增为 1", after.json?.taken === 1, JSON.stringify(after.json));
+}
+
+// ---------- 6. 名额上限（capacity=2） ----------
+console.log("\n[6] 名额并发安全 / 满员");
+{
+  const r = await req("POST", `/api/events/${eventId}/signup`, { name: "李四", phone: "13900002222" });
+  ck("第 2 人报名成功", r.status === 201, `got ${r.status}`);
+  const full = await req("POST", `/api/events/${eventId}/signup`, { name: "王五", phone: "13700003333" });
+  ck("满员后 410", full.status === 410, `got ${full.status} ${full.text.slice(0, 80)}`);
+}
+
+// ---------- 7. 管理端登录 ----------
+console.log("\n[7] 管理端 PIN 登录");
+let session = null;
+{
+  const nokey = await req("POST", `/api/admin/${eventId}/auth`, { key: "0".repeat(32), pin: PIN });
+  ck("错误 key 403", nokey.status === 403, `got ${nokey.status}`);
+
+  const nopin = await req("POST", `/api/admin/${eventId}/auth`, { key: globalThis.__key, pin: "000000" });
+  ck("错误 PIN 401", nopin.status === 401, `got ${nopin.status}`);
+
+  const ok = await req("POST", `/api/admin/${eventId}/auth`, { key: globalThis.__key, pin: PIN });
+  ck("正确凭证登录成功", ok.status === 200 && /^[0-9a-f]{64}$/.test(ok.json?.token || ""),
+    `got ${ok.status} ${ok.text.slice(0, 120)}`);
+  ck("expiresIn = 86400", ok.json?.expiresIn === 86400);
+  session = ok.json?.token;
+}
+if (!session) { console.log("\n登录失败，后续跳过"); process.exit(1); }
+const AUTH = { authorization: `Bearer ${session}` };
+
+// ---------- 8. 名单 ----------
+console.log("\n[8] 名单与统计");
+{
+  const r = await req("GET", `/api/admin/${eventId}/signups`, null, AUTH);
+  ck("返回 200", r.status === 200, `got ${r.status}`);
+  ck("共 2 条报名", r.json?.signups?.length === 2, String(r.json?.signups?.length));
+  ck("stats 正确", r.json?.stats?.total === 2 && r.json?.stats?.checked === 0 && r.json?.stats?.unchecked === 2,
+    JSON.stringify(r.json?.stats));
+  signupId = r.json?.signups?.find(s => s.phone === "13800001111")?.id ?? null;
+  const noauth = await req("GET", `/api/admin/${eventId}/signups`);
+  ck("无 session 401", noauth.status === 401, `got ${noauth.status}`);
+}
+
+// ---------- 9. 扫码签到（token / JSON 包裹） ----------
+console.log("\n[9] 签到");
+{
+  const r = await req("POST", `/api/admin/${eventId}/checkin`, { token: JSON.stringify({ t: signupToken }) }, AUTH);
+  ck("扫码签到成功（JSON 包裹）", r.status === 200 && r.json?.ok === true && r.json?.already_checked === false,
+    `got ${r.status} ${r.text.slice(0, 120)}`);
+  ck("返回签到时间", /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(r.json?.checked_in_at || ""), r.json?.checked_in_at);
+
+  const again = await req("POST", `/api/admin/${eventId}/checkin`, { token: signupToken }, AUTH);
+  ck("重复签到幂等", again.status === 200 && again.json?.already_checked === true,
+    `got ${again.status} ${again.text.slice(0, 120)}`);
+
+  const manual = await req("POST", `/api/admin/${eventId}/checkin`, { phone: "13900002222" }, AUTH);
+  ck("手机号补签成功", manual.status === 200 && manual.json?.already_checked === false, `got ${manual.status}`);
+
+  const miss = await req("POST", `/api/admin/${eventId}/checkin`, { token: "f".repeat(32) }, AUTH);
+  ck("未知签到码 404", miss.status === 404, `got ${miss.status}`);
+}
+
+// ---------- 10. 撤销签到 ----------
+console.log("\n[10] 撤销签到");
+{
+  const r = await req("POST", `/api/admin/${eventId}/uncheck`, { signup_id: signupId }, AUTH);
+  ck("撤销成功", r.status === 200 && r.json?.ok === true, `got ${r.status}`);
+  const list = await req("GET", `/api/admin/${eventId}/signups`, null, AUTH);
+  ck("统计同步更新", list.json?.stats?.checked === 1 && list.json?.stats?.unchecked === 1,
+    JSON.stringify(list.json?.stats));
+}
+
+// ---------- 11. CSV 导出 ----------
+console.log("\n[11] CSV 导出");
+{
+  const r = await req("GET", `/api/admin/${eventId}/export?token=${session}`);
+  ck("返回 200 text/csv", r.status === 200 && (r.headers.get("content-type") || "").includes("text/csv"),
+    `got ${r.status} ${r.headers.get("content-type")}`);
+  ck("Content-Disposition 带文件名", (r.headers.get("content-disposition") || "").includes(".csv"),
+    r.headers.get("content-disposition"));
+
+  // 注意：fetch 的 text() 按 UTF-8 decode 规范会自动吃掉前导 BOM，必须验原始字节
+  const buf = await fetch(`${BASE}/api/admin/${eventId}/export?token=${session}`, {
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  }).then(x => x.arrayBuffer()).then(b => new Uint8Array(b));
+  ck("带 UTF-8 BOM（原始字节 EF BB BF）",
+    buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf,
+    `first3=${[...buf.slice(0, 3)].map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
+
+  ck("表头中文正常", r.text.includes("姓名,手机号,签到状态"),
+    JSON.stringify(r.text.slice(0, 40)));
+  ck("含 2 行数据", r.text.trim().split("\r\n").length === 3, String(r.text.trim().split("\r\n").length));
+  ck("签到状态列正确", r.text.includes("未签到") && r.text.includes("已签到"));
+}
+
+// ---------- 12. 截止报名 ----------
+console.log("\n[12] 截止 / 恢复报名");
+{
+  const r = await req("POST", `/api/admin/${eventId}/close`, { closed: true }, AUTH);
+  ck("截止成功", r.status === 200 && r.json?.closed === true, `got ${r.status}`);
+  const info = await req("GET", `/api/events/${eventId}`);
+  ck("公开页显示 closed", info.json?.closed === true);
+  const blocked = await req("POST", `/api/events/${eventId}/signup`, { name: "赵六", phone: "13600004444" });
+  ck("截止后报名 410", blocked.status === 410, `got ${blocked.status} ${blocked.text.slice(0, 80)}`);
+  const open = await req("POST", `/api/admin/${eventId}/close`, { closed: false }, AUTH);
+  ck("恢复报名", open.status === 200 && open.json?.closed === false);
+}
+
+// ---------- 13. 前端静态页 ----------
+console.log("\n[13] 静态页面");
+for (const p of ["/index.html", "/e.html", "/manage.html", "/css/style.css", "/js/api.js", "/vendor/qrcode.min.js", "/vendor/jsQR.js"]) {
+  let r = null;
+  for (let i = 0; i < 3 && !r; i++) {
+    try { r = await fetch(`${BASE}${p}`, { signal: AbortSignal.timeout(TIMEOUT_MS) }); }
+    catch { if (i === 2) throw new Error(`GET ${p} 连接失败`); await new Promise(s => setTimeout(s, 1000 * (i + 1))); }
+  }
+  ck(`${p} 可访问`, r.status === 200, `got ${r.status}`);
+}
+
+// ---------- 14. 清理测试数据 ----------
+if (process.env.TOKEN_FILE || process.env.CLOUDFLARE_API_TOKEN) {
+  console.log("\n[14] 清理测试数据");
+  try {
+    const { readFileSync } = await import("node:fs");
+    const token = (process.env.TOKEN_FILE ? readFileSync(process.env.TOKEN_FILE, "utf8").trim() : "")
+      || process.env.CLOUDFLARE_API_TOKEN;
+    const dbs = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/d1/database`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.json());
+    const db = dbs.result.find(d => d.name === "event-signin-db");
+    const q = sql => fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/d1/database/${db.uuid}/query`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ sql }),
+    }).then(r => r.json());
+    await q(`DELETE FROM signups WHERE event_id = '${eventId}'`);
+    await q(`DELETE FROM admin_sessions WHERE event_id = '${eventId}'`);
+    await q(`DELETE FROM events WHERE id = '${eventId}'`);
+    const v = await q(`SELECT COUNT(*) AS n FROM events WHERE id = '${eventId}'`);
+    ck("测试活动已清除", v.result?.[0]?.results?.[0]?.n === 0, JSON.stringify(v.result?.[0]?.results));
+  } catch (e) {
+    console.log(`  清理失败（不影响功能）: ${e.message}`);
+  }
+} else {
+  console.log(`\n[14] 跳过清理（无令牌）。残留活动 id=${eventId}`);
+}
+
+console.log(`\n===== pass=${pass} fail=${fail} =====`);
+if (fails.length) console.log("失败用例:\n - " + fails.join("\n - "));
+process.exit(fail ? 1 : 0);

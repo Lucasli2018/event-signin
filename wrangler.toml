@@ -6,8 +6,8 @@ name = "event-signin"
 pages_build_output_dir = "public"
 compatibility_date = "2025-06-01"
 
-# D1 绑定（后端 env.DB）。首次部署前在 Dashboard 创建 D1 数据库并填入 database_id。
+# D1 绑定（后端 env.DB）。
 [[d1_databases]]
 binding = "DB"
 database_name = "event-signin-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "11405d6f-4f4a-4927-893b-29cbc0549478"

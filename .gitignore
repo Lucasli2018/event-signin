@@ -1,3 +1,7 @@
 .wrangler/
+.wrangler-dev-state/
 .tmp-npm/
+.tmp-token
+.tmp-shots/
 node_modules/
+.init-out.txt
