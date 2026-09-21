@@ -1,5 +1,23 @@
 -- event-signin 数据库 schema（供参考/手动建库；运行时 middleware 会自动幂等建表）
 
+CREATE TABLE IF NOT EXISTS accounts (
+  id TEXT PRIMARY KEY,                -- 16 位随机 hex
+  email TEXT NOT NULL UNIQUE,         -- 小写归一化后的邮箱
+  display_name TEXT,                  -- 昵称（可选）
+  pw_hash TEXT NOT NULL,              -- HMAC-SHA256(password, pw_salt)
+  pw_salt TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
+);
+
+CREATE TABLE IF NOT EXISTS account_sessions (
+  token TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
+  expires_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_sessions_acct ON account_sessions(account_id, expires_at);
+
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,                -- 10 位随机 hex
   name TEXT NOT NULL,
@@ -12,6 +30,7 @@ CREATE TABLE IF NOT EXISTS events (
   pin_hash TEXT NOT NULL,             -- HMAC-SHA256(pin, pin_salt)
   pin_salt TEXT NOT NULL,
   closed INTEGER NOT NULL DEFAULT 0,  -- 1 = 停止报名
+  owner_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,  -- 账号系统：所属组织者（旧活动为 NULL）
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
 );
 

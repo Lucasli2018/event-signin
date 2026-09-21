@@ -19,11 +19,23 @@ QR 生成用本地 `vendor/qrcode.min.js`，扫码用本地 `vendor/jsQR.js`，�
 
 ## 鉴权模型
 
+系统支持**两套并列的鉴权方式**，互不冲突：
+
+### A. 账号系统（推荐，多活动集中管理）
+- 访问 `/account.html` 用**邮箱 + 密码**注册 / 登录（httpOnly Cookie `es_acct` 保存，30 天有效，本地 http 不加 Secure 便于开发，生产 https 自动加 Secure）。
+- 登录后进入仪表盘：可集中看到「我的活动」列表，并直接创建 / 管理，**无需记忆管理链接与 PIN**。
+- 登录态下创建的活动自动绑定 `events.owner_id`；管理页（`manage.html?id=...`，不带 key）检测到本账号是 owner 时**免 PIN 直接进**。
+- 账号相关接口：`POST /api/account/register`、`POST /api/account/login`、`POST /api/account/logout`、`GET /api/account/me`、`GET /api/account/events`。
+- 注册 / 登录均带内存 rate-limit（15 分钟 20 次）；密码用与 PIN 相同的 `HMAC-SHA256(password, salt)` 存储。
+- *当前未做邮箱验证（无邮件服务），作为后续增强项。*
+
+### B. 旧模式：每活动独立密钥 + PIN（向后兼容）
 - 创建活动后得到两个链接：
   - **报名链接** `/e.html?id=...` —— 公开发群里
   - **管理链接** `/manage.html?id=...&key=...` —— 含 admin_key，自己保存
 - 管理页需再输入创建时设置的 6-8 位 PIN 换 session token（24h 有效，D1 存储，内存 rate-limit 15 分钟 20 次）
 - 签到二维码内容为 `{"t":"<16字节hex token>"}`，不暴露报名记录 id
+- 未登录账号时创建活动仍**必须设置 PIN**；登录账号后创建则 PIN 可选（留空自动生成隐藏 PIN 作兜底）。
 
 ## 目录结构
 
@@ -34,13 +46,18 @@ public/                 静态前端
   manage.html           管理页（扫码/名单/导出）
   vendor/               qrcode.min.js / jsQR.js
 functions/
-  _middleware.js        CORS + 首访自动建表
-  _shared/              crypto(PIN哈希/token) + helpers(JSON/session/时间)
-  api/events.js         POST 创建活动
+  _middleware.js        CORS + 首访自动建表（含 accounts/account_sessions + events.owner_id 迁移）
+  _shared/              crypto(PIN哈希/token) + helpers(JSON/session/时间) + account(Cookie会话/账号校验)
+  api/account/register.js  POST 邮箱注册（自动登录，写 Cookie）
+  api/account/login.js     POST 邮箱登录（写 Cookie）
+  api/account/logout.js    POST 登出（清 Cookie）
+  api/account/me.js        GET 当前账号
+  api/account/events.js    GET 我的活动列表
+  api/events.js         POST 创建活动（登录态绑定 owner_id，PIN 可选）
   api/events/[id].js    GET 活动公开信息
   api/events/[id]/signup.js  POST 报名（名额并发安全）
-  api/admin/_guard.js        管理端守卫（活动存在 + session）
-  api/admin/[id]/auth.js     POST PIN 登录
+  api/admin/_guard.js        管理端守卫（活动存在 + 旧 session 或 账号 owner 二选一）
+  api/admin/[id]/auth.js     POST PIN 登录（旧模式）
   api/admin/[id]/signups.js  GET 名单+统计
   api/admin/[id]/checkin.js  POST 签到（token/手机号，幂等）
   api/admin/[id]/uncheck.js  POST 撤销签到

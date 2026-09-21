@@ -130,7 +130,10 @@ async function uncheck(signupId) {
 document.getElementById("btnRefresh").addEventListener("click", refreshList);
 
 document.getElementById("btnExport").addEventListener("click", () => {
-  const url = `/api/admin/${encodeURIComponent(eventId)}/export?token=${encodeURIComponent(sessionToken)}`;
+  // 账号模式（sessionToken 为空）靠 Cookie 鉴权，导出走顶级导航自动带 Cookie
+  const url = sessionToken
+    ? `/api/admin/${encodeURIComponent(eventId)}/export?token=${encodeURIComponent(sessionToken)}`
+    : `/api/admin/${encodeURIComponent(eventId)}/export`;
   const a = document.createElement("a");
   a.href = url;
   a.download = "";
@@ -289,12 +292,38 @@ document.getElementById("btnManual").addEventListener("click", () => {
   document.getElementById("fManualPhone").value = "";
 });
 
-// ============ 自动恢复会话 ============
+// ============ 自动进入：优先账号免 PIN，其次 legacy session，最后 PIN 登录 ============
 if (eventId && adminKey && sessionToken) {
+  // legacy 恢复
   api(`/api/admin/${encodeURIComponent(eventId)}/signups`, { token: sessionToken })
     .then((r) => enterMain(r.event))
     .catch(() => {
       sessionStorage.removeItem(`es-session-${eventId}`);
       sessionToken = null;
+      tryAccountEntry();
     });
+} else if (eventId) {
+  tryAccountEntry();
+}
+
+// 账号已登录且拥有本活动 → 免输 PIN 直接进；否则回退到 PIN 登录（缺 key 则提示无效链接）
+async function tryAccountEntry() {
+  try {
+    const me = await api("/api/account/me");
+    if (me && me.account) {
+      const r = await api(`/api/admin/${encodeURIComponent(eventId)}/signups`);
+      enterMain(r.event);
+      return;
+    }
+  } catch { /* 未登录或非 owner */ }
+  showPinLogin();
+}
+
+function showPinLogin() {
+  if (!adminKey) {
+    document.getElementById("loginCard").classList.add("hidden");
+    document.getElementById("badLink").classList.remove("hidden");
+  } else {
+    document.getElementById("loginCard").classList.remove("hidden");
+  }
 }

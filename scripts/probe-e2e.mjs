@@ -217,6 +217,79 @@ console.log("\n[12] 截止 / 恢复报名");
   ck("恢复报名", open.status === 200 && open.json?.closed === false);
 }
 
+// ---------- A. 账号系统 ----------
+console.log("\n[A] 账号系统（注册/登录/免 PIN 管理）");
+{
+  const email = `e2e-${stamp}@probe.test`;
+  const password = "probe1234";
+
+  const reg = await req("POST", "/api/account/register", { email, password, displayName: "探针" });
+  ck("注册返回 201", reg.status === 201, `got ${reg.status} ${reg.text.slice(0, 120)}`);
+  const sc = (reg.headers.get("set-cookie") || "").split(";")[0];
+  ck("下发 es_acct Cookie", sc.startsWith("es_acct="), sc);
+  const acctCookie = sc;
+
+  const dupReg = await req("POST", "/api/account/register", { email, password });
+  ck("重复邮箱 409", dupReg.status === 409, `got ${dupReg.status}`);
+
+  const me0 = await req("GET", "/api/account/me", null, { cookie: acctCookie });
+  ck("me 返回账号", me0.status === 200 && me0.json?.account?.email === email, JSON.stringify(me0.json));
+
+  // 登录态下创建活动（PIN 留空 → owner 绑定，免 PIN）
+  const c = await req("POST", "/api/events", { name: NAME + " (账号)", event_time: "2026-10-02 10:00", capacity: 5 }, { cookie: acctCookie });
+  ck("账号创建活动 201", c.status === 201, `got ${c.status} ${c.text.slice(0, 120)}`);
+  ck("owner 标记 true", c.json?.owner === true);
+  ck("管理链接不带 key（免 PIN）", !c.json?.manage_path?.includes("key="), c.json?.manage_path);
+  const acctEventId = c.json?.id;
+
+  // 账号免 PIN 进管理页
+  const list = await req("GET", `/api/admin/${acctEventId}/signups`, null, { cookie: acctCookie });
+  ck("账号 owner 免 PIN 进管理", list.status === 200, `got ${list.status} ${list.text.slice(0, 120)}`);
+
+  // 无登录访问他人活动被拒
+  const noAuth = await req("GET", `/api/admin/${acctEventId}/signups`);
+  ck("无登录访问被拒", noAuth.status === 401 || noAuth.status === 403, `got ${noAuth.status}`);
+
+  const mine = await req("GET", "/api/account/events", null, { cookie: acctCookie });
+  ck("我的活动列表含刚建活动", (mine.json?.events || []).some(e => e.id === acctEventId),
+    JSON.stringify((mine.json?.events || []).map(e => e.id)));
+
+  // 登出 → me 401
+  const out = await req("POST", "/api/account/logout", null, { cookie: acctCookie });
+  ck("登出 200", out.status === 200);
+  const me1 = await req("GET", "/api/account/me", null, { cookie: acctCookie });
+  ck("登出后 me 401", me1.status === 401, `got ${me1.status}`);
+
+  // 重新登录 + 错误密码
+  const login = await req("POST", "/api/account/login", { email, password });
+  ck("重新登录 200", login.status === 200 && (login.headers.get("set-cookie") || "").includes("es_acct="), `got ${login.status}`);
+  const badLogin = await req("POST", "/api/account/login", { email, password: "wrong" });
+  ck("错误密码 401", badLogin.status === 401, `got ${badLogin.status}`);
+
+  // 清理账号数据（需 D1 令牌）
+  if (process.env.TOKEN_FILE || process.env.CLOUDFLARE_API_TOKEN) {
+    try {
+      const { readFileSync } = await import("node:fs");
+      const token = (process.env.TOKEN_FILE ? readFileSync(process.env.TOKEN_FILE, "utf8").trim() : "") || process.env.CLOUDFLARE_API_TOKEN;
+      const dbs = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/d1/database`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
+      const db = dbs.result.find(d => d.name === "event-signin-db");
+      const q = sql => fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/d1/database/${db.uuid}/query`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ sql }),
+      }).then(r => r.json());
+      const acc = await q(`SELECT id FROM accounts WHERE email='${email}'`);
+      const accId = acc.result?.[0]?.results?.[0]?.id;
+      if (accId) {
+        await q(`DELETE FROM account_sessions WHERE account_id='${accId}'`);
+        await q(`DELETE FROM events WHERE owner_id='${accId}'`);
+        await q(`DELETE FROM accounts WHERE id='${accId}'`);
+      }
+      ck("账号测试数据已清理", true);
+    } catch (e) { console.log(`  账号清理失败: ${e.message}`); }
+  } else {
+    console.log(`  账号测试账号 ${email} 未清理（无令牌）`);
+  }
+}
+
 // ---------- 13. 前端静态页 ----------
 console.log("\n[13] 静态页面");
 for (const p of ["/index.html", "/e.html", "/manage.html", "/css/style.css", "/js/api.js", "/vendor/qrcode.min.js", "/vendor/jsQR.js"]) {

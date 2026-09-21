@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的账号 - 活动报名签到</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>👤 我的账号</h1>
+    <div class="sub">登录后集中管理你创建的所有活动</div>
+  </div>
+  <div class="topnav"><a href="/">← 返回创建活动</a></div>
+
+  <!-- 登录 / 注册 -->
+  <div class="card" id="authCard">
+    <h2 id="authTitle">登录</h2>
+    <div class="msg" id="authMsg"></div>
+    <div class="field">
+      <label>邮箱</label>
+      <input id="fEmail" type="email" autocomplete="username" placeholder="you@example.com">
+    </div>
+    <div class="field" id="nameField" style="display:none">
+      <label>昵称（可选）</label>
+      <input id="fName" maxlength="40" placeholder="如：小明">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input id="fPassword" type="password" autocomplete="current-password" placeholder="至少 8 位">
+    </div>
+    <button class="btn" id="btnAuth">登录</button>
+    <div class="toggle-row">
+      <span id="toggleText">还没有账号？</span>
+      <a href="#" id="toggleMode">去注册</a>
+    </div>
+  </div>
+
+  <!-- 仪表盘 -->
+  <div id="dash" class="hidden">
+    <div class="card">
+      <div class="greeting">
+        <span id="hiName">你好</span>
+        <button class="btn small secondary" id="btnLogout">退出登录</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>➕ 创建活动</h2>
+      <div class="msg" id="createMsg"></div>
+      <div class="field">
+        <label>活动名称 *</label>
+        <input id="cName" maxlength="60" placeholder="如：周六羽毛球局 / 第 12 期读书会">
+      </div>
+      <div class="field">
+        <label>活动时间 *</label>
+        <input id="cTime" type="datetime-local">
+      </div>
+      <div class="field">
+        <label>活动地点</label>
+        <input id="cLoc" maxlength="120" placeholder="如：社区活动中心 3 楼">
+      </div>
+      <div class="field">
+        <label>活动简介</label>
+        <textarea id="cDesc" rows="2" maxlength="500" placeholder="补充说明（可选）"></textarea>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>名额 *</label>
+          <input id="cCap" type="number" min="1" max="100000" value="30">
+        </div>
+        <div class="field">
+          <label>管理 PIN（可选）</label>
+          <input id="cPin" type="password" inputmode="numeric" maxlength="8" placeholder="留空则用账号管理">
+        </div>
+      </div>
+      <button class="btn" id="btnCreate">创建活动</button>
+    </div>
+
+    <div class="card">
+      <h2>📋 我的活动</h2>
+      <ul class="signup-list" id="evList"></ul>
+      <div class="empty hidden" id="evEmpty">还没有活动，先创建一个吧</div>
+    </div>
+  </div>
+
+  <div class="footer">活动报名签到 · 账号中心</div>
+</div>
+
+<script src="/vendor/qrcode.min.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/account.js"></script>
+</body>
+</html>

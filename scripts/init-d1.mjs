@@ -78,7 +78,7 @@ if (fail) process.exit(1);
 // 3. 自检：表名、索引、行数
 const T = await query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name");
 const I = await query("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%' ORDER BY name");
-const C = await query("SELECT (SELECT COUNT(*) FROM events) AS events, (SELECT COUNT(*) FROM signups) AS signups, (SELECT COUNT(*) FROM admin_sessions) AS sessions");
+const C = await query("SELECT (SELECT COUNT(*) FROM events) AS events, (SELECT COUNT(*) FROM signups) AS signups, (SELECT COUNT(*) FROM admin_sessions) AS sessions, (SELECT COUNT(*) FROM accounts) AS accounts, (SELECT COUNT(*) FROM account_sessions) AS acct_sessions");
 console.log("tables :", T[0].results.map(r => r.name).join(", "));
 console.log("indexes:", I[0].results.map(r => r.name).join(", "));
 console.log("counts :", JSON.stringify(C[0].results[0]));

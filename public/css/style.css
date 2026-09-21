@@ -153,3 +153,19 @@ body {
 .empty { text-align: center; color: var(--muted); padding: 28px 0; font-size: 14px; }
 .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 24px; }
 .hidden { display: none !important; }
+
+/* ===== 账号中心 ===== */
+.greeting { display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 600; }
+.toggle-row { text-align: center; font-size: 13px; color: var(--muted); margin-top: 12px; }
+.toggle-row a { color: var(--primary); text-decoration: none; font-weight: 600; }
+.topnav { text-align: center; margin-bottom: 12px; }
+.topnav a { color: var(--primary); text-decoration: none; font-size: 13px; }
+
+.ev-main { flex: 1; min-width: 0; }
+.ev-name { font-weight: 600; }
+.ev-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.ev-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+.ev-actions .btn { padding: 6px 12px; font-size: 13px; }
+.ev-actions .btn.small { width: auto; }
+.signup-list li { flex-wrap: wrap; }
+
