@@ -62,6 +62,8 @@ function renderEvent(ev) {
   if (ev.location) {
     document.getElementById("evLocRow").style.display = "";
     document.getElementById("evLoc").textContent = ev.location;
+  } else {
+    document.getElementById("evLocRow").style.display = "none";
   }
   const pct = ev.capacity ? Math.min(100, (ev.taken / ev.capacity) * 100) : 0;
   document.getElementById("fill").style.width = pct + "%";
@@ -69,46 +71,134 @@ function renderEvent(ev) {
   document.getElementById("closedText").textContent = ev.closed ? "已截止报名" : "报名中";
   document.getElementById("btnClose").textContent = ev.closed ? "恢复报名" : "截止报名";
   document.getElementById("btnArchive").textContent = ev.archived ? "📂 取消归档" : "📦 归档";
+
+  // 活动详情卡片（归档/软删状态已由按钮与列表体现，此处只放参与者关心的信息）
+  const infoEl = document.getElementById("evInfo");
+  if (infoEl) {
+    const remain = Math.max(0, (ev.capacity || 0) - (ev.taken || 0));
+    infoEl.innerHTML = `
+      <div><strong>报名状态</strong> <span class="status-badge ${ev.closed ? "closed" : "active"}">${ev.closed ? "已截止" : "报名中"}</span></div>
+      <div><strong>已报名</strong> ${ev.taken || 0} / ${ev.capacity || 0}</div>
+      <div><strong>剩余名额</strong> ${remain}</div>
+      <div><strong>活动时间</strong> ${escapeHtml(ev.event_time || "-")}</div>
+      <div><strong>地点</strong> ${escapeHtml(ev.location || "-")}</div>
+    `;
+  }
 }
 
 // ============ 名单 ============
 let closedState = false;
 
+let listFilter = "all";   // all | unchecked | checked
+let lastSignups = [];     // 最近一次拉取的完整名单（筛选与搜索在本地做）
+
+const FILTERS = [
+  { id: "filterAll", key: "all" },
+  { id: "filterUnchecked", key: "unchecked" },
+  { id: "filterChecked", key: "checked" },
+];
+
+for (const f of FILTERS) {
+  const btn = document.getElementById(f.id);
+  if (btn) btn.addEventListener("click", () => { listFilter = f.key; renderList(); });
+}
+
+document.getElementById("searchInput").addEventListener("input", renderList);
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function extraText(s) {
+  const parts = [];
+  if (s.company) parts.push("公司：" + s.company);
+  if (s.remark) parts.push("备注：" + s.remark);
+  return parts.join(" · ");
+}
+
+// 按当前筛选 + 搜索词渲染名单（纯本地过滤，不重复请求接口）
+function renderList() {
+  const q = document.getElementById("searchInput").value.trim().toLowerCase();
+  let rows = lastSignups;
+  if (listFilter === "unchecked") rows = rows.filter((s) => !s.checked_in_at);
+  else if (listFilter === "checked") rows = rows.filter((s) => !!s.checked_in_at);
+  if (q) {
+    rows = rows.filter((s) =>
+      (s.name || "").toLowerCase().includes(q) ||
+      (s.phone || "").toLowerCase().includes(q) ||
+      (s.company || "").toLowerCase().includes(q) ||
+      (s.remark || "").toLowerCase().includes(q));
+  }
+
+  for (const f of FILTERS) {
+    const btn = document.getElementById(f.id);
+    if (btn) btn.classList.toggle("active", f.key === listFilter);
+  }
+
+  const countEl = document.getElementById("listCount");
+  if (countEl) {
+    countEl.textContent = rows.length === lastSignups.length
+      ? `共 ${lastSignups.length} 人`
+      : `筛选出 ${rows.length} / ${lastSignups.length} 人`;
+  }
+
+  const emptyTip = document.getElementById("emptyTip");
+  emptyTip.classList.toggle("hidden", rows.length > 0);
+  emptyTip.textContent = lastSignups.length === 0 ? "还没有人报名" : "没有符合条件的报名者";
+
+  const ul = document.getElementById("list");
+  ul.innerHTML = "";
+  for (const s of rows) {
+    const li = document.createElement("li");
+    const checked = !!s.checked_in_at;
+    li.title = "点击查看签到码";
+    li.innerHTML = `
+      <span class="badge ${checked ? "checked" : "unchecked"}">${checked ? "已签到" : "未签到"}</span>
+      <span class="name"></span>
+      <span class="phone"></span>
+      <span class="time">${checked ? escapeHtml(s.checked_in_at.slice(5, 16)) : escapeHtml((s.created_at || "").slice(5, 16))}</span>
+    `;
+    li.querySelector(".name").textContent = s.name;
+    li.querySelector(".phone").textContent = s.phone;
+
+    const extra = extraText(s);
+    if (extra) {
+      const span = document.createElement("span");
+      span.className = "extra";
+      span.textContent = extra;   // textContent 赋值，天然防注入
+      li.appendChild(span);
+    }
+
+    if (checked) {
+      const undo = document.createElement("button");
+      undo.className = "uncheck-btn";
+      undo.textContent = "撤销";
+      undo.onclick = (e) => { e.stopPropagation(); uncheck(s.id); };
+      li.appendChild(undo);
+    }
+
+    // 点击整行展示该报名者的签到码（参与者手机没电时现场代展示）
+    li.addEventListener("click", () => showSignupQR(s));
+    ul.appendChild(li);
+  }
+}
+
 async function refreshList() {
   try {
     const r = await api(`/api/admin/${encodeURIComponent(eventId)}/signups`, { token: sessionToken });
     renderEvent(r.event);
+    currentEvent = { ...currentEvent, ...r.event };
     closedState = r.event.closed;
+    lastSignups = r.signups || [];
 
     document.getElementById("stTotal").textContent = r.stats.total;
     document.getElementById("stChecked").textContent = r.stats.checked;
     document.getElementById("stUnchecked").textContent = r.stats.unchecked;
     renderDashboard(r.stats);
 
-    const ul = document.getElementById("list");
-    ul.innerHTML = "";
-    document.getElementById("emptyTip").classList.toggle("hidden", r.signups.length > 0);
-
-    for (const s of r.signups) {
-      const li = document.createElement("li");
-      const checked = !!s.checked_in_at;
-      li.innerHTML = `
-        <span class="badge ${checked ? "checked" : "unchecked"}">${checked ? "已签到" : "未签到"}</span>
-        <span class="name"></span>
-        <span class="phone"></span>
-        <span class="time">${checked ? escapeHtml(s.checked_in_at.slice(5, 16)) : escapeHtml((s.created_at || "").slice(5, 16))}</span>
-      `;
-      li.querySelector(".name").textContent = s.name;
-      li.querySelector(".phone").textContent = s.phone;
-      if (checked) {
-        const undo = document.createElement("button");
-        undo.className = "uncheck-btn";
-        undo.textContent = "撤销";
-        undo.onclick = () => uncheck(s.id);
-        li.appendChild(undo);
-      }
-      ul.appendChild(li);
-    }
+    renderList();
   } catch (err) {
     if (err.status === 401) {
       sessionStorage.removeItem(`es-session-${eventId}`);
@@ -119,18 +209,29 @@ async function refreshList() {
   }
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[c]));
+// ============ 个人签到码 ============
+function showSignupQR(s) {
+  if (!s.token) return;
+  document.getElementById("qrName").textContent = `${s.name}（${s.phone}）`;
+  const slot = document.getElementById("qrSlot");
+  slot.innerHTML = "";
+  new QRCode(slot, {
+    text: JSON.stringify({ t: s.token }),
+    width: 220,
+    height: 220,
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+  const codeEl = document.getElementById("qrToken");
+  if (codeEl) codeEl.textContent = `签到码：${s.token}`;
+  document.getElementById("qrModal").classList.remove("hidden");
 }
 
-function extraText(s) {
-  const parts = [];
-  if (s.company) parts.push("公司：" + escapeHtml(s.company));
-  if (s.remark) parts.push("备注：" + escapeHtml(s.remark));
-  return parts.join(" · ");
-}
+document.getElementById("qrClose").addEventListener("click", () => {
+  document.getElementById("qrModal").classList.add("hidden");
+});
+document.getElementById("qrModal").addEventListener("click", (e) => {
+  if (e.target === document.getElementById("qrModal")) document.getElementById("qrModal").classList.add("hidden");
+});
 
 // 签到看板：签到率进度条 + 按时段分布条形图
 function renderDashboard(stats) {
@@ -165,17 +266,18 @@ function renderDashboard(stats) {
 }
 
 async function uncheck(signupId) {
-  if (!confirm("确定撤销该签到？")) return;
-  try {
-    await api(`/api/admin/${encodeURIComponent(eventId)}/uncheck`, {
-      method: "POST",
-      token: sessionToken,
-      body: { signup_id: signupId },
-    });
-    refreshList();
-  } catch (err) {
-    alert(err.message);
-  }
+  openConfirm("撤销签到", "确定撤销该签到吗？撤销后该报名者将回到「未签到」状态。", async () => {
+    try {
+      await api(`/api/admin/${encodeURIComponent(eventId)}/uncheck`, {
+        method: "POST",
+        token: sessionToken,
+        body: { signup_id: signupId },
+      });
+      refreshList();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
 }
 
 document.getElementById("btnRefresh").addEventListener("click", refreshList);
@@ -423,16 +525,35 @@ async function inviteCollab() {
 }
 
 async function removeCollab(accountId) {
-  if (!confirm("确定移除该协作者？")) return;
-  try {
-    await api(`/api/events/${encodeURIComponent(eventId)}/collaborators/${encodeURIComponent(accountId)}`, { method: "DELETE" });
-    loadCollaborators();
-  } catch (err) { alert(err.message); }
+  openConfirm("移除协作者", "确定移除该协作者吗？移除后对方将无法再管理本活动。", async () => {
+    try {
+      await api(`/api/events/${encodeURIComponent(eventId)}/collaborators/${encodeURIComponent(accountId)}`, { method: "DELETE" });
+      loadCollaborators();
+    } catch (err) { alert(err.message); }
+  });
 }
 
 btnInvite.addEventListener("click", inviteCollab);
 
-// ============ 编辑 / 归档 / 删除 ============
+// ============ 确认弹窗 ==========
+let confirmCallback = null;
+function openConfirm(title, msg, onYes) {
+  document.getElementById("confirmTitle").textContent = title;
+  document.getElementById("confirmMsg").textContent = msg;
+  confirmCallback = onYes;
+  document.getElementById("confirmModal").classList.remove("hidden");
+}
+document.getElementById("confirmYes").addEventListener("click", () => {
+  document.getElementById("confirmModal").classList.add("hidden");
+  if (confirmCallback) { confirmCallback(); confirmCallback = null; }
+});
+document.getElementById("confirmNo").addEventListener("click", () => {
+  document.getElementById("confirmModal").classList.add("hidden");
+  confirmCallback = null;
+});
+document.getElementById("confirmModal").addEventListener("click", (e) => { if (e.target === document.getElementById("confirmModal")) { document.getElementById("confirmModal").classList.add("hidden"); confirmCallback = null; } });
+
+// ============ 归档 / 删除 ============
 const editModal = document.getElementById("editModal");
 const editMsg = document.getElementById("editMsg");
 
@@ -506,33 +627,37 @@ document.getElementById("btnSaveEdit").addEventListener("click", async () => {
   }
 });
 
-document.getElementById("btnArchive").addEventListener("click", async () => {
+document.getElementById("btnArchive").addEventListener("click", () => {
   if (!currentEvent) return;
   const next = !currentEvent.archived;
-  try {
-    const r = await api(`/api/events/${encodeURIComponent(eventId)}`, {
-      method: "PUT",
-      token: sessionToken,
-      body: { archived: next },
-    });
-    currentEvent = { ...currentEvent, archived: next };
-    renderEvent(currentEvent);
-  } catch (err) {
-    alert(err.message);
-  }
+  const action = next ? "归档" : "取消归档";
+  openConfirm(action + "确认", `确定要${action}「${currentEvent.name}」吗？\n归档后活动将从活跃列表隐藏，但数据保留且可取消归档。`, async () => {
+    try {
+      const r = await api(`/api/events/${encodeURIComponent(eventId)}`, {
+        method: "PUT",
+        token: sessionToken,
+        body: { archived: next },
+      });
+      currentEvent = { ...currentEvent, archived: next };
+      renderEvent(currentEvent);
+    } catch (err) {
+      alert(err.message);
+    }
+  });
 });
 
-document.getElementById("btnDelete").addEventListener("click", async () => {
+document.getElementById("btnDelete").addEventListener("click", () => {
   if (!currentEvent) return;
-  if (!confirm("确定删除该活动？删除后将从列表隐藏（数据保留，可恢复）。")) return;
-  try {
-    await api(`/api/events/${encodeURIComponent(eventId)}`, {
-      method: "DELETE",
-      token: sessionToken,
-    });
-    alert("活动已删除，可在账号中心「回收站」恢复");
-    location.href = "/account.html?tab=trash";
-  } catch (err) {
-    alert(err.message);
-  }
+  openConfirm("删除活动", `确定删除「${currentEvent.name}」吗？\n删除后将从列表隐藏（数据保留，可在账号中心「回收站」恢复）。`, async () => {
+    try {
+      await api(`/api/events/${encodeURIComponent(eventId)}`, {
+        method: "DELETE",
+        token: sessionToken,
+      });
+      alert("活动已删除，可在账号中心「回收站」恢复");
+      location.href = "/account.html?tab=trash";
+    } catch (err) {
+      alert(err.message);
+    }
+  });
 });

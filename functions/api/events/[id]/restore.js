@@ -1,8 +1,8 @@
 // POST /api/events/:id/restore   恢复已软删的活动（清 deleted_at）
 // 鉴权：owner 或 admin session（复用 _guard）
 
-import { json, getEventRaw } from "../../_shared/helpers.js";
-import { requireAdmin } from "../admin/_guard.js";
+import { json } from "../../../_shared/helpers.js";
+import { requireAdmin } from "../../admin/_guard.js";
 
 export async function onRequestPost({ request, env, params }) {
   const g = await requireAdmin(request, env, params.id);

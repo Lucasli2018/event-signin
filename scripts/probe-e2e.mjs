@@ -198,8 +198,9 @@ console.log("\n[11] CSV 导出");
     buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf,
     `first3=${[...buf.slice(0, 3)].map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
 
-  ck("表头中文正常", r.text.includes("姓名,手机号,签到状态"),
-    JSON.stringify(r.text.slice(0, 40)));
+  const header = r.text.trim().split("\r\n")[0] || "";
+  ck("表头中文正常（未启用自定义字段时不含公司/备注列）",
+    header === "姓名,手机号,签到状态,签到时间,报名时间", JSON.stringify(header));
   ck("含 2 行数据", r.text.trim().split("\r\n").length === 3, String(r.text.trim().split("\r\n").length));
   ck("签到状态列正确", r.text.includes("未签到") && r.text.includes("已签到"));
 }
@@ -281,6 +282,57 @@ console.log("\n[A] 账号系统（注册/登录/免 PIN 管理）");
   const flist = await req("GET", `/api/admin/${feId}/signups`, null, { cookie: acctCookie });
   const fs = (flist.json?.signups || []).find(s => s.phone === "13500005555");
   ck("名单含 company/remark", fs?.company === "测试公司" && fs?.remark === "带备注", JSON.stringify(fs));
+  ck("名单含 token（管理端可代展示签到码）", /^[0-9a-f]{32}$/.test(fs?.token || ""), String(fs?.token));
+  ck("管理端名单 event 回填 description/fields",
+    !!flist.json?.event && "description" in flist.json.event && flist.json?.event?.fields?.company === true,
+    JSON.stringify({ desc: flist.json?.event?.description, fields: flist.json?.event?.fields }));
+  const fexp = await req("GET", `/api/admin/${feId}/export`, null, { cookie: acctCookie });
+  ck("CSV 列随 fields 增加公司/备注",
+    (fexp.text.trim().split("\r\n")[0] || "").includes("公司") && fexp.text.includes("测试公司"),
+    JSON.stringify(fexp.text.slice(0, 60)));
+
+  // 回归：编辑活动不得清空简介
+  // （此前 admin/signups 的 event 未返回 description → openEdit 回填成空串 → 保存即覆盖为 null）
+  const de = await req("POST", "/api/events", {
+    name: NAME + " (简介)", event_time: "2026-10-06 09:00", description: "原标题简介", capacity: 5,
+  }, { cookie: acctCookie });
+  const deId = de.json?.id;
+  const dlist = await req("GET", `/api/admin/${deId}/signups`, null, { cookie: acctCookie });
+  ck("管理端名单回填 description（编辑不丢简介）", dlist.json?.event?.description === "原标题简介",
+    JSON.stringify(dlist.json?.event?.description));
+
+  // 反向：未启用字段的活动不得收集 company/remark（防止任意塞数据）
+  const nf = await req("POST", "/api/events", {
+    name: NAME + " (无字段)", event_time: "2026-10-04 09:00", capacity: 5,
+  }, { cookie: acctCookie });
+  const nfId = nf.json?.id;
+  ck("账号创建无字段活动 201", nf.status === 201, `got ${nf.status}`);
+  const nfget = await req("GET", `/api/events/${nfId}`);
+  ck("无字段活动公开 fields 为空对象", nfget.json?.fields && Object.keys(nfget.json.fields).length === 0,
+    JSON.stringify(nfget.json?.fields));
+  const nfsign = await req("POST", `/api/events/${nfId}/signup`, { name: "赵六", phone: "13500007777", company: "不该被收", remark: "也不该" });
+  ck("无字段活动报名 201", nfsign.status === 201, `got ${nfsign.status}`);
+  const nflist = await req("GET", `/api/admin/${nfId}/signups`, null, { cookie: acctCookie });
+  const nfs = (nflist.json?.signups || []).find(s => s.phone === "13500007777");
+  ck("未启用字段时忽略 company/remark", nfs && !nfs.company && !nfs.remark, JSON.stringify(nfs));
+  const nfexp = await req("GET", `/api/admin/${nfId}/export`, null, { cookie: acctCookie });
+  ck("无字段活动 CSV 不含公司/备注列", !nfexp.text.includes("公司") && !nfexp.text.includes("备注"),
+    JSON.stringify(nfexp.text.slice(0, 60)));
+
+  // CSV 公式注入防护：= + - @ 开头需被加 ' 前缀，避免 Excel 当公式执行
+  await req("POST", `/api/events/${nfId}/signup`, { name: "=cmd|'/c calc'!A1", phone: "13500008888" });
+  const injExp = await req("GET", `/api/admin/${nfId}/export`, null, { cookie: acctCookie });
+  ck("CSV 公式注入已转义", injExp.text.includes("'=cmd|") && !injExp.text.includes(",=cmd|"),
+    JSON.stringify(injExp.text.split("\r\n").pop()?.slice(0, 50)));
+
+  // 创建接口的 fields 白名单：未知键必须被丢弃
+  const wl = await req("POST", "/api/events", {
+    name: NAME + " (白名单)", event_time: "2026-10-05 09:00", capacity: 5,
+    fields: { company: true, evil: true, remarkable: true },
+  }, { cookie: acctCookie });
+  ck("fields 白名单丢弃未知键",
+    wl.json?.fields?.company === true && wl.json?.fields?.evil === undefined && wl.json?.fields?.remarkable === undefined,
+    JSON.stringify(wl.json?.fields));
 
   // 协作多人管理
   const email2 = `e2e2-${stamp}@probe.test`;
@@ -359,6 +411,15 @@ for (const p of ["/index.html", "/e.html", "/manage.html", "/css/style.css", "/j
   ck(`${p} 可访问`, r.status === 200, `got ${r.status}`);
 }
 
+// 管理页增强的静态依赖与元素（缺 qrcode 库会让「查看签到码」报 ReferenceError）
+{
+  const mhtml = await fetch(`${BASE}/manage.html`, { signal: AbortSignal.timeout(TIMEOUT_MS) }).then(r => r.text());
+  ck("manage.html 引入 qrcode.min.js", mhtml.includes("/vendor/qrcode.min.js"), "");
+  ck("manage.html 含签到码/计数/确认弹窗元素",
+    ["qrSlot", "qrToken", "listCount", "confirmModal"].every(id => mhtml.includes(`id="${id}"`)), "");
+  ck("manage.html 已移除语义错误的「仅看归档」", !mhtml.includes("filterArchived"), "");
+}
+
 // ---------- 13b. 动态 OG meta（分享预览） ----------
 console.log("\n[13b] 动态 OG meta");
 {
@@ -377,6 +438,13 @@ console.log("\n[13b] 动态 OG meta");
   ck("主 og:image 唯一", (html.match(/property="og:image"/g) || []).length === 1, "");
   const png = await fetch(`${BASE}/og-default.png`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   ck("og-default.png 为 PNG", png.status === 200 && (png.headers.get("content-type") || "").includes("image/png"), `got ${png.status} ${png.headers.get("content-type")}`);
+
+  // clean URL：/e.html 会被 308 重定向到 /e，真正渲染的是 /e —— 直连 /e 也必须注入
+  const rDirect = await fetch(`${BASE}/e?id=${eventId}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const htmlDirect = await rDirect.text();
+  ck("/e（clean URL）也注入 og:title", rDirect.status === 200 && htmlDirect.includes('property="og:title"') && htmlDirect.includes(NAME), `got ${rDirect.status}`);
+  ck("/e 响应带 OG 缓存头", (rDirect.headers.get("cache-control") || "").includes("max-age=60"), rDirect.headers.get("cache-control"));
+  ck("/e 占位标记已替换", !htmlDirect.includes("<!--og-meta-->"), "");
 }
 
 // ---------- 14. 清理测试数据 ----------

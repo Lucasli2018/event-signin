@@ -159,9 +159,11 @@ export async function onRequest(context) {
     }
   };
 
-  // 报名页 /e.html：注入动态 OG meta，便于分享到微信/群时生成预览卡片
+  // 报名页：注入动态 OG meta，便于分享到微信/群时生成预览卡片。
+  // 注意 Pages 的 clean URL 会把 /e.html 308 重定向到 /e，两个路径都必须匹配，
+  // 否则真正被渲染的 /e 拿不到注入（分享抓取跟随重定向后落到 /e）。
   const url = new URL(request.url);
-  if (request.method === "GET" && url.pathname === "/e.html") {
+  if (request.method === "GET" && (url.pathname === "/e.html" || url.pathname === "/e")) {
     const res = await context.next();
     const ct = res.headers.get("content-type") || "";
     if (res.status === 200 && ct.includes("text/html")) {

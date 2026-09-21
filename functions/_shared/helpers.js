@@ -104,3 +104,27 @@ export function isValidDateTime(s) {
 export function isValidPhone(s) {
   return typeof s === "string" && /^[+\d][\d\s-]{5,19}$/.test(s.trim());
 }
+
+// ============ 报名自定义字段 ============
+// 只认白名单键，避免前端塞入任意键污染 events.fields
+export const FIELD_KEYS = ["company", "remark"];
+
+// 把库里的 fields（JSON 字符串 / 对象 / null）统一读成对象
+export function parseEventFields(raw) {
+  if (!raw) return {};
+  if (typeof raw === "object") return Array.isArray(raw) ? {} : raw;
+  try {
+    const o = JSON.parse(String(raw));
+    return o && typeof o === "object" && !Array.isArray(o) ? o : {};
+  } catch {
+    return {};
+  }
+}
+
+// 归一化前端传入的 fields：只保留白名单里的 true 键；无有效字段返回 null（= 不收集）
+export function normalizeFields(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const out = {};
+  for (const k of FIELD_KEYS) if (input[k]) out[k] = true;
+  return Object.keys(out).length ? out : null;
+}

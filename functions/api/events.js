@@ -3,7 +3,7 @@
 // 返回: { id, admin_key, signup_path, manage_path }
 
 import { hashPassword, genSalt, genToken } from "../_shared/crypto.js";
-import { json, fail, readJson, isValidDateTime } from "../_shared/helpers.js";
+import { json, fail, readJson, isValidDateTime, normalizeFields } from "../_shared/helpers.js";
 import { parseCookies, requireAccount, COOKIE } from "../_shared/account.js";
 
 export async function onRequestPost({ request, env }) {
@@ -16,6 +16,8 @@ export async function onRequestPost({ request, env }) {
   const description = String(body.description || "").trim();
   const capacity = Number(body.capacity);
   const pin = String(body.pin || "");
+  // 报名自定义字段定义（白名单过滤）；无有效字段存 NULL
+  const fieldsDef = normalizeFields(body.fields);
 
   // 账号登录态（Cookie）→ 绑定 owner，PIN 可留空（自动生成隐藏 PIN 作兜底）
   const token = parseCookies(request)[COOKIE];
@@ -41,6 +43,9 @@ export async function onRequestPost({ request, env }) {
   if (location.length > 120) return fail("地点最长 120 字");
   if (description.length > 500) return fail("简介最长 500 字");
 
+  // 将前端 fields 归一化为 JSON 字符串（无有效字段存 NULL）
+  const fieldsJson = fieldsDef ? JSON.stringify(fieldsDef) : null;
+
   const id = genToken(5);        // 10 位 hex，分享链接用
   const adminKey = genToken(16); // 管理链接密钥
   const pinSalt = genSalt(16);
@@ -55,7 +60,7 @@ export async function onRequestPost({ request, env }) {
     id,
     admin_key: adminKey,
     owner: !!ownerId,
-    fields: fieldsObj,
+    fields: fieldsDef || {},
     signup_path: `/e.html?id=${id}`,
     manage_path: ownerId ? `/manage.html?id=${id}` : `/manage.html?id=${id}&key=${adminKey}`,
   }, 201);

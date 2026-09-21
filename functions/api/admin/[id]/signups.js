@@ -1,7 +1,8 @@
 // GET /api/admin/:id/signups  报名名单（需 session）
-// 返回: { event, signups: [...] }
+// 返回: { event, signups: [...], stats }
+// signups 含 token（签到码原文）—— 管理端已鉴权，现场需可代展示个人签到码
 
-import { json } from "../../../_shared/helpers.js";
+import { json, parseEventFields } from "../../../_shared/helpers.js";
 import { requireAdmin } from "../_guard.js";
 
 export async function onRequestGet({ request, env, params }) {
@@ -9,7 +10,7 @@ export async function onRequestGet({ request, env, params }) {
   if (!g.ok) return g.response;
 
   const rows = await env.DB.prepare(
-    `SELECT id, name, phone, company, remark, checked_in_at, created_at
+    `SELECT id, name, phone, company, remark, token, checked_in_at, created_at
      FROM signups WHERE event_id = ?
      ORDER BY created_at ASC, id ASC`
   ).bind(g.ev.id).all();
@@ -33,10 +34,14 @@ export async function onRequestGet({ request, env, params }) {
       name: g.ev.name,
       event_time: g.ev.event_time,
       location: g.ev.location,
+      // 管理页编辑弹窗依赖 description / fields 回填，缺失会导致保存时把简介清空
+      description: g.ev.description,
+      fields: parseEventFields(g.ev.fields),
       capacity: g.ev.capacity,
       taken: g.ev.taken,
       closed: !!g.ev.closed,
       archived: !!g.ev.archived,
+      deleted_at: g.ev.deleted_at,
     },
     signups: list,
     stats: { total: list.length, checked: checkedCount, unchecked: list.length - checkedCount, checkin_distribution },

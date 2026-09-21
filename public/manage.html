@@ -32,6 +32,7 @@
         <div class="progress-bar"><div class="fill" id="fill"></div></div>
         <div class="progress-text"><span id="takenText"></span><span id="closedText"></span></div>
       </div>
+      <div class="card-info" id="evInfo"></div>
       <div class="actions">
         <button class="btn small coral" id="btnPoster">📣 海报</button>
         <button class="btn small secondary" id="btnEdit">✏️ 编辑</button>
@@ -101,6 +102,13 @@
         <button class="btn secondary" id="btnRefresh">刷新</button>
         <button class="btn secondary" id="btnExport">导出 CSV</button>
         <button class="btn secondary" id="btnClose">截止报名</button>
+        <input id="searchInput" type="search" placeholder="搜索名单…" style="flex:1;min-width:120px">
+      </div>
+      <div class="toolbar">
+        <button class="btn secondary" id="filterAll">全部</button>
+        <button class="btn secondary" id="filterUnchecked">未签到</button>
+        <button class="btn secondary" id="filterChecked">已签到</button>
+        <span class="list-count" id="listCount"></span>
       </div>
       <div class="card">
         <ul class="signup-list" id="list"></ul>
@@ -130,7 +138,35 @@
   </div>
 </div>
 
+<!-- 确认弹窗 -->
+<div class="modal hidden" id="confirmModal">
+  <div class="modal-card">
+    <h2 id="confirmTitle">确认操作</h2>
+    <p id="confirmMsg" style="font-size:14px;color:var(--muted);margin-bottom:16px"></p>
+    <div class="row">
+      <button class="btn danger" id="confirmYes">确认</button>
+      <button class="btn secondary" id="confirmNo">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 签到码弹窗（点击名单某行展示，供现场代出示） -->
+<div class="modal hidden" id="qrModal">
+  <div class="modal-card">
+    <h2 id="qrName"></h2>
+    <div class="qr-box">
+      <div id="qrSlot" class="qr-slot"></div>
+      <div class="qr-tip">请用本页「扫码签到」扫描</div>
+      <div class="token-text" id="qrToken"></div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn secondary" id="qrClose">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script src="/vendor/jsQR.js"></script>
+<script src="/vendor/qrcode.min.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/poster.js"></script>
 <script src="/js/manage.js"></script>

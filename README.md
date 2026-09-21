@@ -71,6 +71,7 @@ functions/
 scripts/
   init-d1.mjs           远端 D1 建库 + 建表（幂等，跑完自检）
   probe-e2e.mjs         端到端探针（线上/本地真实 HTTP 全链路）
+  probe-ui.mjs          管理页交互探针（真实无头 Chrome + CDP）
   gen-og.py             生成 public/og-default.png（Pillow）
 schema.sql              参考 schema（middleware 会自动幂等建表）
 ```
@@ -103,6 +104,8 @@ CLOUDFLARE_ACCOUNT_ID=332b848d9f5d9ec2808bdb855763eb8e \
   wrangler pages deploy public --project-name=event-signin
 # 4. 线上端到端验证
 TOKEN_FILE=.tmp-token node scripts/probe-e2e.mjs
+# 5. 管理页交互验证（需本地 dev 服务，无头 Chrome + CDP）
+BASE=http://localhost:8788 node scripts/probe-ui.mjs
 ```
 
 > 摄像头扫码要求 HTTPS（Cloudflare Pages 默认满足）或 localhost。
@@ -111,7 +114,14 @@ TOKEN_FILE=.tmp-token node scripts/probe-e2e.mjs
 
 - 站点：https://event-signin.pages.dev
 - D1：`event-signin-db` (11405d6f-4f4a-4927-893b-29cbc0549478)
-- 探针覆盖：404 / 创建 / 参数校验 / 公开信息脱敏 / 报名幂等 / 满员 410 / 错误 key 403 / 错误 PIN 401 / 登录 / 名单统计 / 扫码签到幂等 / 手机号补签 / 撤销 / CSV(BOM) / 截止报名 / 编辑 / 软删 / 回收站 / 恢复 / 协作 / 动态 OG meta / 品牌封面图 / 静态页可达
+- `probe-e2e.mjs`（110 项）覆盖：404 / 创建 / 参数校验 / 公开信息脱敏 / 报名幂等 / 满员 410 / 错误 key 403 / 错误 PIN 401 / 登录 / 名单统计 / 扫码签到幂等 / 手机号补签 / 撤销 / CSV(BOM) / 截止报名 / 编辑 / 软删 / 回收站 / 恢复 / 协作 / 报名自定义字段(company/remark) / 动态 OG meta / 品牌封面图 / 静态页可达
+- `probe-ui.mjs`（26 项）覆盖：脚本无报错 / QRCode 库加载 / 名单渲染 / 公司备注展示 / 筛选与搜索 / 行点击弹签到码且二维码真实渲染 / 撤销按钮事件隔离 / 详情卡片回填 / 报名页字段联动
+
+### 已知环境注意
+
+- Pages 的 clean URL 会把 `/e.html` **308 重定向到 `/e`**，真正渲染的是 `/e`。middleware 的 OG 注入因此必须同时匹配两个路径。
+- Pages 项目 `production_branch` 必须为 `master`，否则 `--branch=master` 只进 preview 环境。
+- 子目录函数引用共享模块的层级：`api/events/[id]/x.js` → 共享模块要 `../../../_shared/`（写少一层会导致**整个 Functions 构建失败**）。
 
 ## 本机网络注意
 

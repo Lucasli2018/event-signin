@@ -6,7 +6,7 @@
 // 插 signup 撞 UNIQUE(event_id, phone) 时回退占位。
 
 import { genToken } from "../../../_shared/crypto.js";
-import { json, fail, readJson, getEvent, isValidPhone } from "../../../_shared/helpers.js";
+import { json, fail, readJson, getEvent, isValidPhone, parseEventFields } from "../../../_shared/helpers.js";
 
 export async function onRequestPost({ request, env, params }) {
   const ev = await getEvent(env, params.id);
@@ -18,8 +18,10 @@ export async function onRequestPost({ request, env, params }) {
 
   const name = String(body.name || "").trim();
   const phone = String(body.phone || "").trim();
-  const company = body.company !== undefined ? String(body.company || "").trim() : "";
-  const remark = body.remark !== undefined ? String(body.remark || "").trim() : "";
+  // 只有活动启用了对应字段才收集，避免往未启用的活动塞入无关数据
+  const fieldsDef = parseEventFields(ev.fields);
+  const company = fieldsDef.company && body.company !== undefined ? String(body.company || "").trim() : "";
+  const remark = fieldsDef.remark && body.remark !== undefined ? String(body.remark || "").trim() : "";
 
   if (name.length < 1 || name.length > 30) return fail("姓名需 1-30 字");
   if (!isValidPhone(phone)) return fail("手机号格式不正确");

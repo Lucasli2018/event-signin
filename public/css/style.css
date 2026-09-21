@@ -167,9 +167,34 @@ body {
 .ev-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
 .ev-actions .btn { padding: 6px 12px; font-size: 13px; }
 .ev-actions .btn.small { width: auto; }
-.signup-list li { flex-wrap: wrap; }
+/* ===== 活动详情卡片 ===== */
+.signup-list li { flex-wrap: wrap; cursor: pointer; }
+.signup-list li:hover { background: #f8fafc; }
+/* 公司/备注独占第二行（order 保证排在撤销按钮之后） */
+.signup-list .extra { order: 10; flex-basis: 100%; font-size: 12px; color: var(--muted); margin-top: 2px; }
 
-/* ===== 编辑 / 归档 / 删除 ===== */
+.card-info { margin-top: 12px; font-size: 13px; }
+.card-info div { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--border); }
+.card-info div:last-child { border-bottom: none; }
+.card-info strong { color: var(--muted); font-weight: 500; }
+.status-badge { font-weight: 600; padding: 2px 8px; border-radius: 99px; font-size: 12px; }
+.status-badge.closed { background: #fdecec; color: var(--danger); }
+.status-badge.active { background: var(--success-bg); color: var(--success); }
+
+/* 名单工具栏：筛选选中态 + 人数计数 */
+.toolbar .btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.list-count { align-self: center; margin-left: auto; font-size: 13px; color: var(--muted); }
+
+/* ===== 确认弹窗 ===== */
+#confirmModal .modal-card p { white-space: pre-wrap; }
+
+/* ===== 移动端：名单换行堆叠，不做横向滚动 ===== */
+@media (max-width: 560px) {
+  .signup-list li { gap: 8px; padding: 10px 4px; }
+  .signup-list .name, .signup-list .phone { white-space: nowrap; }
+  .signup-list .time { font-size: 11px; }
+  .list-count { flex-basis: 100%; margin-left: 0; text-align: right; }
+}
 .actions { display: flex; gap: 8px; margin-top: 14px; }
 .actions .btn { flex: 1; }
 .modal { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }

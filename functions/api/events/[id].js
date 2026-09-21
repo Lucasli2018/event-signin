@@ -2,7 +2,7 @@
 // PUT /api/events/:id    编辑活动（owner 或 admin session）
 // DELETE /api/events/:id 软删除活动（owner 或 admin session）
 
-import { json, fail, getEvent, isValidDateTime, nowFullString } from "../../_shared/helpers.js";
+import { json, fail, getEvent, isValidDateTime, nowFullString, parseEventFields, normalizeFields } from "../../_shared/helpers.js";
 import { requireAdmin } from "../admin/_guard.js";
 
 export async function onRequestGet({ env, params }) {
@@ -19,6 +19,8 @@ export async function onRequestGet({ env, params }) {
     taken: ev.taken,
     remaining: Math.max(0, ev.capacity - ev.taken),
     closed: !!ev.closed,
+    // 报名页据此渲染需要额外收集的字段
+    fields: parseEventFields(ev.fields),
   });
 }
 
@@ -37,14 +39,13 @@ export async function onRequestPut({ request, env, params }) {
   const capacityRaw = body.capacity !== undefined ? Number(body.capacity) : ev.capacity;
   const archived = body.archived !== undefined ? (body.archived ? 1 : 0) : (ev.archived ? 1 : 0);
 
-  // 报名自定义字段：提供 body.fields 才更新，否则保留原配置
+  // 报名自定义字段：提供 body.fields 才更新，否则保留原配置；白名单过滤
   let fieldsJson = ev.fields;
+  let outFields = parseEventFields(ev.fields);
   if (body.fields !== undefined) {
-    if (body.fields && typeof body.fields === "object" && !Array.isArray(body.fields)) {
-      try { fieldsJson = JSON.stringify(body.fields); } catch { fieldsJson = ev.fields; }
-    } else if (body.fields === null || body.fields === false) {
-      fieldsJson = null;
-    }
+    const def = normalizeFields(body.fields);
+    fieldsJson = def ? JSON.stringify(def) : null;
+    outFields = def || {};
   }
 
   if (name.length < 2 || name.length > 60) return fail("活动名称需 2-60 字");
@@ -59,9 +60,6 @@ export async function onRequestPut({ request, env, params }) {
   await env.DB.prepare(
     `UPDATE events SET name=?, event_time=?, location=?, description=?, capacity=?, archived=?, fields=? WHERE id=?`
   ).bind(name, eventTime, location || null, description || null, capacityRaw, archived, fieldsJson, ev.id).run();
-
-  let outFields = {};
-  try { outFields = fieldsJson ? JSON.parse(fieldsJson) : {}; } catch (_) {}
 
   return json({
     ok: true,
