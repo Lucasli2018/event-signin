@@ -45,6 +45,19 @@
       <div class="stat-card"><div class="num" id="stUnchecked">0</div><div class="lbl">未签到</div></div>
     </div>
 
+    <div class="card hidden" id="collabCard">
+      <h2>👥 协作者</h2>
+      <div class="msg" id="collabMsg"></div>
+      <div id="collabInvite" class="row hidden">
+        <div class="field" style="flex:1">
+          <input id="fCollabEmail" type="email" placeholder="协作者邮箱（需已注册）">
+        </div>
+        <button class="btn small" id="btnInvite">邀请</button>
+      </div>
+      <ul class="signup-list" id="collabList"></ul>
+      <div class="empty hidden" id="collabEmpty">暂无协作者</div>
+    </div>
+
     <div class="dashboard card">
       <h3>📊 签到看板</h3>
       <div class="checkin-rate">

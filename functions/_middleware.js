@@ -96,6 +96,19 @@ async function ensureDatabase(env) {
         await env.DB.prepare("ALTER TABLE events ADD COLUMN deleted_at TEXT").run();
         console.log("[middleware] 已为 events 表补加 deleted_at 列");
       }
+      // 迁移：协作者表（幂等建表，旧库首次访问时创建）
+      await env.DB.prepare(
+        `CREATE TABLE IF NOT EXISTS event_collaborators (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+          account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+          role TEXT NOT NULL DEFAULT 'editor',
+          created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
+          UNIQUE(event_id, account_id)
+        )`
+      ).run();
+      await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ec_event ON event_collaborators(event_id)").run();
+      await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ec_acct ON event_collaborators(account_id)").run();
     } catch (e) {
       console.error("[middleware] owner_id 迁移失败:", e);
     }

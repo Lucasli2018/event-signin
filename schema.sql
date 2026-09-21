@@ -60,3 +60,16 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_event ON admin_sessions(event_id, expires_at);
+
+-- 活动协作者（多人协同管理）
+CREATE TABLE IF NOT EXISTS event_collaborators (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'editor',  -- editor | admin（目前均具管理权限）
+  created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
+  UNIQUE(event_id, account_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ec_event ON event_collaborators(event_id);
+CREATE INDEX IF NOT EXISTS idx_ec_acct ON event_collaborators(account_id);

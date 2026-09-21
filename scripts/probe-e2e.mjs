@@ -282,6 +282,36 @@ console.log("\n[A] 账号系统（注册/登录/免 PIN 管理）");
   const fs = (flist.json?.signups || []).find(s => s.phone === "13500005555");
   ck("名单含 company/remark", fs?.company === "测试公司" && fs?.remark === "带备注", JSON.stringify(fs));
 
+  // 协作多人管理
+  const email2 = `e2e2-${stamp}@probe.test`;
+  const reg2 = await req("POST", "/api/account/register", { email: email2, password: "probe1234", displayName: "协作者" });
+  ck("协作账号2注册", reg2.status === 201, `got ${reg2.status}`);
+  const cookie2 = (reg2.headers.get("set-cookie") || "").split(";")[0];
+  const inv = await req("POST", `/api/events/${acctEventId}/collaborators`, { email: email2 }, { cookie: acctCookie });
+  ck("owner 邀请协作者", inv.status === 201 && inv.json?.collaborator?.email === email2, `got ${inv.status} ${inv.text.slice(0, 120)}`);
+  const colist = await req("GET", `/api/events/${acctEventId}/collaborators`, null, { cookie: acctCookie });
+  ck("协作者列表含账号2", (colist.json?.collaborators || []).some(c => c.email === email2), JSON.stringify(colist.json?.collaborators));
+  const cadmin = await req("GET", `/api/admin/${acctEventId}/signups`, null, { cookie: cookie2 });
+  ck("协作者可进管理页", cadmin.status === 200, `got ${cadmin.status}`);
+  const cinv = await req("POST", `/api/events/${acctEventId}/collaborators`, { email: email2 }, { cookie: cookie2 });
+  ck("协作者不能邀请他人(403)", cinv.status === 403, `got ${cinv.status}`);
+  const cId = (colist.json?.collaborators || []).find(c => c.email === email2)?.account_id;
+  const rmCol = await req("DELETE", `/api/events/${acctEventId}/collaborators/${encodeURIComponent(cId || "")}`, null, { cookie: acctCookie });
+  ck("owner 移除协作者", rmCol.status === 200, `got ${rmCol.status}`);
+  if (process.env.TOKEN_FILE || process.env.CLOUDFLARE_API_TOKEN) {
+    try {
+      const { readFileSync } = await import("node:fs");
+      const token = (process.env.TOKEN_FILE ? readFileSync(process.env.TOKEN_FILE, "utf8").trim() : "") || process.env.CLOUDFLARE_API_TOKEN;
+      const dbs = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/d1/database`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
+      const db = dbs.result.find(d => d.name === "event-signin-db");
+      const q = sql => fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/d1/database/${db.uuid}/query`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ sql }) }).then(r => r.json());
+      const a2 = await q(`SELECT id FROM accounts WHERE email='${email2}'`);
+      const a2id = a2.result?.[0]?.results?.[0]?.id;
+      if (a2id) { await q(`DELETE FROM account_sessions WHERE account_id='${a2id}'`); await q(`DELETE FROM accounts WHERE id='${a2id}'`); }
+      ck("协作账号2已清理", true);
+    } catch (e) { console.log(`  账号2清理失败: ${e.message}`); }
+  } else { console.log(`  协作账号2 ${email2} 未清理（无令牌）`); }
+
   // 登出 → me 401
   const out = await req("POST", "/api/account/logout", null, { cookie: acctCookie });
   ck("登出 200", out.status === 200);

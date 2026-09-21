@@ -6,6 +6,14 @@ let currentEvent = null;
 
 const loginMsg = document.getElementById("loginMsg");
 
+const collabCard = document.getElementById("collabCard");
+const collabMsg = document.getElementById("collabMsg");
+const collabInvite = document.getElementById("collabInvite");
+const fCollabEmail = document.getElementById("fCollabEmail");
+const btnInvite = document.getElementById("btnInvite");
+const collabList = document.getElementById("collabList");
+const collabEmpty = document.getElementById("collabEmpty");
+
 if (!eventId || !adminKey) {
   document.getElementById("loginCard").classList.add("hidden");
   document.getElementById("badLink").classList.remove("hidden");
@@ -370,6 +378,59 @@ function showPinLogin() {
     document.getElementById("loginCard").classList.remove("hidden");
   }
 }
+
+// ============ 协作者 ============
+async function loadCollaborators() {
+  try {
+    const r = await api(`/api/events/${encodeURIComponent(eventId)}/collaborators`);
+    collabCard.classList.remove("hidden");
+    collabEmpty.classList.toggle("hidden", (r.collaborators || []).length > 0);
+    collabInvite.classList.toggle("hidden", !r.isOwner);
+    collabList.innerHTML = "";
+    for (const c of (r.collaborators || [])) {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div class="ev-main">
+          <div class="ev-name"></div>
+          <div class="ev-meta">${escapeHtml(c.email)} · ${escapeHtml(c.role)}</div>
+        </div>
+        <div class="ev-actions"></div>`;
+      li.querySelector(".ev-name").textContent = c.display_name || c.email;
+      if (r.isOwner) {
+        const rm = document.createElement("button");
+        rm.className = "btn small danger";
+        rm.textContent = "移除";
+        rm.onclick = () => removeCollab(c.account_id);
+        li.querySelector(".ev-actions").appendChild(rm);
+      }
+      collabList.appendChild(li);
+    }
+  } catch (err) {
+    if (err.status === 401 || err.status === 403) collabCard.classList.add("hidden");
+  }
+}
+
+async function inviteCollab() {
+  hideMsg(collabMsg);
+  const email = fCollabEmail.value.trim();
+  if (!email) return showMsg(collabMsg, "请输入协作者邮箱");
+  try {
+    const r = await api(`/api/events/${encodeURIComponent(eventId)}/collaborators`, { method: "POST", body: { email } });
+    fCollabEmail.value = "";
+    showMsg(collabMsg, "已邀请 " + (r.collaborator?.email || email), "ok");
+    loadCollaborators();
+  } catch (err) { showMsg(collabMsg, err.message); }
+}
+
+async function removeCollab(accountId) {
+  if (!confirm("确定移除该协作者？")) return;
+  try {
+    await api(`/api/events/${encodeURIComponent(eventId)}/collaborators/${encodeURIComponent(accountId)}`, { method: "DELETE" });
+    loadCollaborators();
+  } catch (err) { alert(err.message); }
+}
+
+btnInvite.addEventListener("click", inviteCollab);
 
 // ============ 编辑 / 归档 / 删除 ============
 const editModal = document.getElementById("editModal");

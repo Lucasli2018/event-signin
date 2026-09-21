@@ -20,11 +20,17 @@ export async function requireAdmin(request, env, eventId) {
     return { ok: true, ev, session: s.session, token: s.token, via: "session" };
   }
 
-  // 2) 账号模式：登录态且是活动 owner
+  // 2) 账号模式：登录态且是活动 owner 或协作者
   const a = await requireAccount(request, env);
   if (a.account) {
     if (a.account.id === ev.owner_id) {
-      return { ok: true, ev, session: null, token: null, via: "account", account: a.account };
+      return { ok: true, ev, session: null, token: null, via: "account", account: a.account, role: "owner" };
+    }
+    const col = await env.DB.prepare(
+      "SELECT role FROM event_collaborators WHERE event_id = ? AND account_id = ?"
+    ).bind(ev.id, a.account.id).first();
+    if (col) {
+      return { ok: true, ev, session: null, token: null, via: "collaborator", account: a.account, role: col.role };
     }
     return { ok: false, response: json({ error: "无权限管理此活动" }, 403) };
   }

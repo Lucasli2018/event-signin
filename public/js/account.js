@@ -18,6 +18,8 @@ const evList = document.getElementById("evList");
 const evEmpty = document.getElementById("evEmpty");
 const evTrash = document.getElementById("evTrash");
 const trashEmpty = document.getElementById("trashEmpty");
+const evCollab = document.getElementById("evCollab");
+const collabEmpty = document.getElementById("collabEmpty");
 
 let mode = "login";
 
@@ -152,10 +154,36 @@ async function loadEvents() {
       copyBtn.onclick = () => copyText(`${location.origin}/e.html?id=${ev.id}`, copyBtn);
       evList.appendChild(li);
     }
+    await loadTrash();
+    await loadCollab();
   } catch (err) {
     if (err.status === 401) { location.reload(); }
     else { evEmpty.classList.remove("hidden"); evEmpty.textContent = "加载失败：" + err.message; }
   }
+}
+
+async function loadCollab() {
+  try {
+    const r = await api("/api/account/events?scope=collaborating");
+    const list = r.events || [];
+    evCollab.innerHTML = "";
+    collabEmpty.classList.toggle("hidden", list.length > 0);
+    for (const ev of list) {
+      const li = document.createElement("li");
+      const closed = ev.closed ? "已截止" : "报名中";
+      li.innerHTML = `
+        <div class="ev-main">
+          <div class="ev-name"></div>
+          <div class="ev-meta">${escapeHtml(ev.event_time)} · 已报 ${ev.taken}/${ev.capacity} · ${closed} · 协作</div>
+        </div>
+        <div class="ev-actions">
+          <a class="btn small" href="/manage.html?id=${encodeURIComponent(ev.id)}">管理</a>
+          <a class="btn small secondary" href="/e.html?id=${encodeURIComponent(ev.id)}" target="_blank">报名链接</a>
+        </div>`;
+      li.querySelector(".ev-name").textContent = ev.name;
+      evCollab.appendChild(li);
+    }
+  } catch { /* ignore */ }
 }
 
 function escapeHtml(s) {

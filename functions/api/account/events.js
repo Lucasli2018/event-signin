@@ -9,16 +9,29 @@ export async function onRequestGet({ request, env }) {
   if (a.error) return fail(a.error, a.status);
 
   const url = new URL(request.url);
-  const trash = url.searchParams.get("scope") === "trash";
-  const where = trash
-    ? "owner_id = ? AND deleted_at IS NOT NULL"
-    : "owner_id = ? AND deleted_at IS NULL";
+  const scope = url.searchParams.get("scope");
 
-  const rows = await env.DB.prepare(
-    `SELECT id, name, event_time, location, capacity, taken, closed, archived, deleted_at, created_at
-     FROM events WHERE ${where}
-     ORDER BY ${trash ? "deleted_at DESC" : "created_at DESC"}, id DESC`
-  ).bind(a.account.id).all();
+  let rows;
+  if (scope === "trash") {
+    rows = await env.DB.prepare(
+      `SELECT id, name, event_time, location, capacity, taken, closed, archived, deleted_at, created_at
+       FROM events WHERE owner_id = ? AND deleted_at IS NOT NULL
+       ORDER BY deleted_at DESC, id DESC`
+    ).bind(a.account.id).all();
+  } else if (scope === "collaborating") {
+    rows = await env.DB.prepare(
+      `SELECT e.id, e.name, e.event_time, e.location, e.capacity, e.taken, e.closed, e.archived, e.created_at
+       FROM events e JOIN event_collaborators c ON c.event_id = e.id
+       WHERE c.account_id = ? AND e.deleted_at IS NULL AND e.owner_id <> ?
+       ORDER BY e.created_at DESC, id DESC`
+    ).bind(a.account.id, a.account.id).all();
+  } else {
+    rows = await env.DB.prepare(
+      `SELECT id, name, event_time, location, capacity, taken, closed, archived, created_at
+       FROM events WHERE owner_id = ? AND deleted_at IS NULL
+       ORDER BY created_at DESC, id DESC`
+    ).bind(a.account.id).all();
+  }
 
   return json({ ok: true, events: rows.results || [] });
 }
