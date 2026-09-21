@@ -16,6 +16,8 @@ const createMsg = document.getElementById("createMsg");
 const btnCreate = document.getElementById("btnCreate");
 const evList = document.getElementById("evList");
 const evEmpty = document.getElementById("evEmpty");
+const evTrash = document.getElementById("evTrash");
+const trashEmpty = document.getElementById("trashEmpty");
 
 let mode = "login";
 
@@ -77,6 +79,9 @@ async function enterDash(account) {
   document.getElementById("hiName").textContent =
     account.displayName ? `你好，${account.displayName}` : `你好，${account.email}`;
   loadEvents();
+  if (new URLSearchParams(location.search).get("tab") === "trash") {
+    setTimeout(() => document.getElementById("trashCard")?.scrollIntoView({ behavior: "smooth" }), 150);
+  }
 }
 
 btnLogout.addEventListener("click", async () => {

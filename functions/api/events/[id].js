@@ -37,6 +37,16 @@ export async function onRequestPut({ request, env, params }) {
   const capacityRaw = body.capacity !== undefined ? Number(body.capacity) : ev.capacity;
   const archived = body.archived !== undefined ? (body.archived ? 1 : 0) : (ev.archived ? 1 : 0);
 
+  // 报名自定义字段：提供 body.fields 才更新，否则保留原配置
+  let fieldsJson = ev.fields;
+  if (body.fields !== undefined) {
+    if (body.fields && typeof body.fields === "object" && !Array.isArray(body.fields)) {
+      try { fieldsJson = JSON.stringify(body.fields); } catch { fieldsJson = ev.fields; }
+    } else if (body.fields === null || body.fields === false) {
+      fieldsJson = null;
+    }
+  }
+
   if (name.length < 2 || name.length > 60) return fail("活动名称需 2-60 字");
   if (!isValidDateTime(eventTime)) return fail("活动时间格式应为 YYYY-MM-DD HH:MM");
   if (!Number.isInteger(capacityRaw) || capacityRaw < 1 || capacityRaw > 100000) {

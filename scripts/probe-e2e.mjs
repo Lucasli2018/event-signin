@@ -254,6 +254,34 @@ console.log("\n[A] 账号系统（注册/登录/免 PIN 管理）");
   ck("我的活动列表含刚建活动", (mine.json?.events || []).some(e => e.id === acctEventId),
     JSON.stringify((mine.json?.events || []).map(e => e.id)));
 
+  // 编辑 / 软删 / 回收站 / 恢复
+  const edit = await req("PUT", `/api/events/${acctEventId}`, { name: NAME + " (改)" }, { cookie: acctCookie });
+  ck("账号编辑活动 PUT", edit.status === 200 && edit.json?.event?.name === NAME + " (改)", `got ${edit.status} ${edit.text.slice(0, 120)}`);
+
+  const del = await req("DELETE", `/api/events/${acctEventId}`, null, { cookie: acctCookie });
+  ck("账号软删活动", del.status === 200, `got ${del.status}`);
+  const trash = await req("GET", "/api/account/events?scope=trash", null, { cookie: acctCookie });
+  ck("回收站可见已删活动", (trash.json?.events || []).some(e => e.id === acctEventId), JSON.stringify((trash.json?.events || []).map(e => e.id)));
+  const restore = await req("POST", `/api/events/${acctEventId}/restore`, null, { cookie: acctCookie });
+  ck("恢复活动", restore.status === 200 && restore.json?.restored === true, `got ${restore.status}`);
+  const active = await req("GET", "/api/account/events", null, { cookie: acctCookie });
+  ck("恢复后回到活跃列表", (active.json?.events || []).some(e => e.id === acctEventId), JSON.stringify((active.json?.events || []).map(e => e.id)));
+
+  // 报名自定义字段：创建带 fields → 报名带 company/remark → 名单含字段
+  const fe = await req("POST", "/api/events", {
+    name: NAME + " (字段)", event_time: "2026-10-03 09:00", capacity: 5,
+    fields: { company: true, remark: true },
+  }, { cookie: acctCookie });
+  ck("账号创建带 fields 活动", fe.status === 201 && fe.json?.owner === true, `got ${fe.status}`);
+  const feId = fe.json?.id;
+  const fget = await req("GET", `/api/events/${feId}`);
+  ck("公开信息含 fields", fget.json?.fields?.company === true && fget.json?.fields?.remark === true, JSON.stringify(fget.json?.fields));
+  const fsign = await req("POST", `/api/events/${feId}/signup`, { name: "王二", phone: "13500005555", company: "测试公司", remark: "带备注" });
+  ck("带字段报名 201", fsign.status === 201, `got ${fsign.status}`);
+  const flist = await req("GET", `/api/admin/${feId}/signups`, null, { cookie: acctCookie });
+  const fs = (flist.json?.signups || []).find(s => s.phone === "13500005555");
+  ck("名单含 company/remark", fs?.company === "测试公司" && fs?.remark === "带备注", JSON.stringify(fs));
+
   // 登出 → me 401
   const out = await req("POST", "/api/account/logout", null, { cookie: acctCookie });
   ck("登出 200", out.status === 200);

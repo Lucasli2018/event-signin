@@ -456,8 +456,8 @@ document.getElementById("btnDelete").addEventListener("click", async () => {
       method: "DELETE",
       token: sessionToken,
     });
-    alert("活动已删除");
-    location.href = "/";
+    alert("活动已删除，可在账号中心「回收站」恢复");
+    location.href = "/account.html?tab=trash";
   } catch (err) {
     alert(err.message);
   }
