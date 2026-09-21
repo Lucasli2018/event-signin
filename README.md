@@ -12,6 +12,7 @@
 - 组织者管理页：PIN 登录、名单实时统计、**摄像头扫码签到**（jsQR）、手机号手动补签、撤销签到、截止/恢复报名
 - 导出 CSV（UTF-8 BOM，Excel 中文不乱码）
 - 活动管理增强：组织者（账号 owner 或旧 PIN 会话）可**编辑**活动（名称/时间/地点/简介/名额，名额不得低于已报名数）、**归档**（保留数据、隐藏于活跃列表）、**软删除**（从列表隐藏，数据可恢复）
+- **分享海报**：报名页 / 管理页一键生成珊瑚橙活动海报（含报名二维码、时间/地点/名额），可**保存 PNG** 转发到微信群；把报名链接分享到微信/群时自动生成 **OG 预览卡片**（`/e.html` 动态注入标题 / 时间地点 / 封面图）
 
 ## 技术栈
 
@@ -44,12 +45,14 @@ QR 生成用本地 `vendor/qrcode.min.js`，扫码用本地 `vendor/jsQR.js`，�
 ```
 public/                 静态前端
   index.html            创建活动
-  e.html                报名页（含个人签到二维码）
-  manage.html           管理页（扫码/名单/导出）
+  e.html                报名页（含个人签到二维码 + 分享海报入口）
+  manage.html           管理页（扫码/名单/导出/分享海报）
+  js/poster.js          Canvas 分享海报生成（含二维码，支持保存 PNG / 复制链接）
+  og-default.png        分享预览封面图（1200x630，珊瑚橙品牌）
   vendor/               qrcode.min.js / jsQR.js
 functions/
-  _middleware.js        CORS + 首访自动建表（含 accounts/account_sessions + events.owner_id 迁移）
-  _shared/              crypto(PIN哈希/token) + helpers(JSON/session/时间) + account(Cookie会话/账号校验)
+  _middleware.js        CORS + 首访自动建表（含 accounts/account_sessions + events.owner_id 迁移）+ /e.html 动态 OG 注入
+  _shared/              crypto(PIN哈希/token) + helpers(JSON/session/时间) + account(Cookie会话/账号校验) + og(分享 OG meta)
   api/account/register.js  POST 邮箱注册（自动登录，写 Cookie）
   api/account/login.js     POST 邮箱登录（写 Cookie）
   api/account/logout.js    POST 登出（清 Cookie）
@@ -68,6 +71,7 @@ functions/
 scripts/
   init-d1.mjs           远端 D1 建库 + 建表（幂等，跑完自检）
   probe-e2e.mjs         端到端探针（线上/本地真实 HTTP 全链路）
+  gen-og.py             生成 public/og-default.png（Pillow）
 schema.sql              参考 schema（middleware 会自动幂等建表）
 ```
 
@@ -107,7 +111,7 @@ TOKEN_FILE=.tmp-token node scripts/probe-e2e.mjs
 
 - 站点：https://event-signin.pages.dev
 - D1：`event-signin-db` (11405d6f-4f4a-4927-893b-29cbc0549478)
-- 探针覆盖：404 / 创建 / 参数校验 / 公开信息脱敏 / 报名幂等 / 满员 410 / 错误 key 403 / 错误 PIN 401 / 登录 / 名单统计 / 扫码签到幂等 / 手机号补签 / 撤销 / CSV(BOM) / 截止报名 / 静态页可达
+- 探针覆盖：404 / 创建 / 参数校验 / 公开信息脱敏 / 报名幂等 / 满员 410 / 错误 key 403 / 错误 PIN 401 / 登录 / 名单统计 / 扫码签到幂等 / 手机号补签 / 撤销 / CSV(BOM) / 截止报名 / 编辑 / 软删 / 回收站 / 恢复 / 协作 / 动态 OG meta / 品牌封面图 / 静态页可达
 
 ## 本机网络注意
 

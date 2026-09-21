@@ -350,13 +350,33 @@ console.log("\n[A] 账号系统（注册/登录/免 PIN 管理）");
 
 // ---------- 13. 前端静态页 ----------
 console.log("\n[13] 静态页面");
-for (const p of ["/index.html", "/e.html", "/manage.html", "/css/style.css", "/js/api.js", "/vendor/qrcode.min.js", "/vendor/jsQR.js"]) {
+for (const p of ["/index.html", "/e.html", "/manage.html", "/css/style.css", "/js/api.js", "/js/poster.js", "/vendor/qrcode.min.js", "/vendor/jsQR.js", "/og-default.png"]) {
   let r = null;
   for (let i = 0; i < 3 && !r; i++) {
     try { r = await fetch(`${BASE}${p}`, { signal: AbortSignal.timeout(TIMEOUT_MS) }); }
     catch { if (i === 2) throw new Error(`GET ${p} 连接失败`); await new Promise(s => setTimeout(s, 1000 * (i + 1))); }
   }
   ck(`${p} 可访问`, r.status === 200, `got ${r.status}`);
+}
+
+// ---------- 13b. 动态 OG meta（分享预览） ----------
+console.log("\n[13b] 动态 OG meta");
+{
+  let r = null;
+  for (let i = 0; i < 3 && !r; i++) {
+    try { r = await fetch(`${BASE}/e.html?id=${eventId}`, { signal: AbortSignal.timeout(TIMEOUT_MS) }); }
+    catch { if (i === 2) throw new Error("GET /e.html 连接失败"); await new Promise(s => setTimeout(s, 1000 * (i + 1))); }
+  }
+  const html = await r.text();
+  ck("e.html 200", r.status === 200, `got ${r.status}`);
+  ck("注入 og:title 为活动名", html.includes('property="og:title"') && html.includes(NAME), "");
+  ck("og:image 指向 og-default.png", html.includes(`property="og:image" content="${BASE}/og-default.png"`), "");
+  ck("og:description 含活动时间", /og:description" content="[^"]*2026-10-01 14:30/.test(html), "");
+  ck("canonical 指向报名页", html.includes(`rel="canonical" href="${BASE}/e.html?id=${eventId}"`), "");
+  ck("占位标记已替换", !html.includes("<!--og-meta-->"), "");
+  ck("主 og:image 唯一", (html.match(/property="og:image"/g) || []).length === 1, "");
+  const png = await fetch(`${BASE}/og-default.png`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  ck("og-default.png 为 PNG", png.status === 200 && (png.headers.get("content-type") || "").includes("image/png"), `got ${png.status} ${png.headers.get("content-type")}`);
 }
 
 // ---------- 14. 清理测试数据 ----------

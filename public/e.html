@@ -8,6 +8,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/favicon.svg">
 <meta name="theme-color" content="#FF7A45">
+<!--og-meta-->
 </head>
 <body>
 <div class="container">
@@ -19,6 +20,9 @@
     <div class="progress-wrap">
       <div class="progress-bar"><div class="fill" id="fill"></div></div>
       <div class="progress-text"><span id="takenText"></span><span id="remainText"></span></div>
+    </div>
+    <div class="actions">
+      <button class="btn small coral" id="btnPoster">📣 生成分享海报</button>
     </div>
   </div>
 
@@ -61,6 +65,7 @@
 
 <script src="/vendor/qrcode.min.js"></script>
 <script src="/js/api.js"></script>
+<script src="/js/poster.js"></script>
 <script src="/js/signup.js"></script>
 </body>
 </html>

@@ -190,3 +190,31 @@ body {
 .checkbox { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text); margin: 4px 16px 4px 0; cursor: pointer; }
 .checkbox input { width: auto; }
 
+/* ===== 珊瑚橙按钮变体（分享海报用，与 favicon 品牌色一致） ===== */
+.btn.coral { background: linear-gradient(135deg, #FF8A5B, #FF6B3D); }
+.btn.coral:hover { background: linear-gradient(135deg, #FF7A45, #F2552A); }
+.btn.coral:disabled { background: #ffc4ac; }
+
+/* ===== 分享海报遮罩 ===== */
+.poster-overlay {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(15, 23, 42, .62);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 16px; overflow-y: auto;
+}
+.poster-modal {
+  width: 100%; max-width: 380px; margin: auto;
+  background: #fff; border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .35);
+  padding: 16px;
+}
+.poster-head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+.poster-x { border: none; background: #f3f4f6; color: var(--muted); width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: 14px; line-height: 1; }
+.poster-x:hover { background: #e5e7eb; }
+.poster-canvas-wrap { text-align: center; }
+.poster-canvas-wrap canvas { width: 100%; max-width: 322px; height: auto; border-radius: 14px; box-shadow: 0 8px 24px rgba(255, 107, 61, .18); }
+.poster-loading { padding: 64px 0; color: var(--muted); font-size: 14px; }
+.poster-actions { display: flex; gap: 10px; margin-top: 14px; }
+.poster-actions .btn { flex: 1; padding: 12px; font-size: 15px; }
+.poster-tip { text-align: center; color: var(--muted); font-size: 12px; margin-top: 10px; }
+

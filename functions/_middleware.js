@@ -1,4 +1,6 @@
-// 全局中间件：CORS、错误兜底、本地/首访自动建表
+// 全局中间件：CORS、错误兜底、本地/首访自动建表、报名页动态 OG 注入
+
+import { buildOgMeta, injectOgMeta } from "./_shared/og.js";
 
 let dbReady = false;
 let initializing = false;
@@ -156,6 +158,27 @@ export async function onRequest(context) {
       });
     }
   };
+
+  // 报名页 /e.html：注入动态 OG meta，便于分享到微信/群时生成预览卡片
+  const url = new URL(request.url);
+  if (request.method === "GET" && url.pathname === "/e.html") {
+    const res = await context.next();
+    const ct = res.headers.get("content-type") || "";
+    if (res.status === 200 && ct.includes("text/html")) {
+      try {
+        const html = await res.text();
+        const { meta } = await buildOgMeta(env, url);
+        const headers = new Headers(res.headers);
+        headers.set("content-type", "text/html; charset=utf-8");
+        headers.set("cache-control", "public, max-age=60");
+        return new Response(injectOgMeta(html, meta), { status: 200, headers });
+      } catch (e) {
+        console.error("[middleware] OG 注入失败:", e);
+        return res;
+      }
+    }
+    return res;
+  }
 
   return context.next();
 }

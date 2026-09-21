@@ -2,6 +2,7 @@
 const eventId = getQuery("id");
 const msg = document.getElementById("msg");
 let eventFields = {};
+let currentEvent = null;
 
 function showSuccess(token, name, duplicated) {
   const payload = JSON.stringify({ t: token });
@@ -30,6 +31,7 @@ async function loadEvent() {
   try {
     const ev = await api(`/api/events/${encodeURIComponent(eventId)}`);
     document.title = `${ev.name} - 活动报名`;
+    currentEvent = ev;
 
     document.getElementById("evName").textContent = ev.name;
     document.getElementById("evTime").textContent = ev.event_time;
@@ -107,6 +109,19 @@ document.getElementById("btnSignup").addEventListener("click", async () => {
     btn.disabled = false;
     btn.textContent = "立即报名";
   }
+});
+
+document.getElementById("btnPoster").addEventListener("click", () => {
+  if (!currentEvent) return;
+  Poster.open({
+    name: currentEvent.name,
+    eventTime: currentEvent.event_time,
+    location: currentEvent.location,
+    description: currentEvent.description,
+    capacity: currentEvent.capacity,
+    taken: currentEvent.taken,
+    url: `${location.origin}/e.html?id=${encodeURIComponent(eventId)}`,
+  });
 });
 
 loadEvent();

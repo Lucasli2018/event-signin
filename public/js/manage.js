@@ -457,6 +457,19 @@ document.getElementById("btnEdit").addEventListener("click", openEdit);
 document.getElementById("btnCancelEdit").addEventListener("click", closeEdit);
 editModal.addEventListener("click", (e) => { if (e.target === editModal) closeEdit(); });
 
+document.getElementById("btnPoster").addEventListener("click", () => {
+  if (!currentEvent) return;
+  Poster.open({
+    name: currentEvent.name,
+    eventTime: currentEvent.event_time,
+    location: currentEvent.location,
+    description: currentEvent.description,
+    capacity: currentEvent.capacity,
+    taken: currentEvent.taken,
+    url: `${location.origin}/e.html?id=${encodeURIComponent(eventId)}`,
+  });
+});
+
 document.getElementById("btnSaveEdit").addEventListener("click", async () => {
   if (!currentEvent) return;
   const name = document.getElementById("efName").value.trim();
