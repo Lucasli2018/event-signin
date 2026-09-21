@@ -2,6 +2,7 @@
 const eventId = getQuery("id");
 const adminKey = getQuery("key");
 let sessionToken = sessionStorage.getItem(`es-session-${eventId}`) || null;
+let currentEvent = null;
 
 const loginMsg = document.getElementById("loginMsg");
 
@@ -41,6 +42,7 @@ async function doLogin() {
 function enterMain(ev) {
   document.getElementById("loginCard").classList.add("hidden");
   document.getElementById("mainArea").classList.remove("hidden");
+  currentEvent = ev;
   renderEvent(ev);
   refreshList();
 }
@@ -58,6 +60,7 @@ function renderEvent(ev) {
   document.getElementById("takenText").textContent = `已报 ${ev.taken}/${ev.capacity}`;
   document.getElementById("closedText").textContent = ev.closed ? "已截止报名" : "报名中";
   document.getElementById("btnClose").textContent = ev.closed ? "恢复报名" : "截止报名";
+  document.getElementById("btnArchive").textContent = ev.archived ? "📂 取消归档" : "📦 归档";
 }
 
 // ============ 名单 ============
@@ -327,3 +330,95 @@ function showPinLogin() {
     document.getElementById("loginCard").classList.remove("hidden");
   }
 }
+
+// ============ 编辑 / 归档 / 删除 ============
+const editModal = document.getElementById("editModal");
+const editMsg = document.getElementById("editMsg");
+
+function fmtToInput(t) {
+  return t ? String(t).replace(" ", "T") : "";
+}
+
+function openEdit() {
+  if (!currentEvent) return;
+  document.getElementById("efName").value = currentEvent.name || "";
+  document.getElementById("efTime").value = fmtToInput(currentEvent.event_time);
+  document.getElementById("efLocation").value = currentEvent.location || "";
+  document.getElementById("efDesc").value = currentEvent.description || "";
+  document.getElementById("efCapacity").value = currentEvent.capacity || 1;
+  hideMsg(editMsg);
+  editModal.classList.remove("hidden");
+}
+
+function closeEdit() { editModal.classList.add("hidden"); }
+
+document.getElementById("btnEdit").addEventListener("click", openEdit);
+document.getElementById("btnCancelEdit").addEventListener("click", closeEdit);
+editModal.addEventListener("click", (e) => { if (e.target === editModal) closeEdit(); });
+
+document.getElementById("btnSaveEdit").addEventListener("click", async () => {
+  if (!currentEvent) return;
+  const name = document.getElementById("efName").value.trim();
+  const timeRaw = document.getElementById("efTime").value;
+  const location_ = document.getElementById("efLocation").value.trim();
+  const description = document.getElementById("efDesc").value.trim();
+  const capacity = Number(document.getElementById("efCapacity").value);
+
+  if (name.length < 2) return showMsg(editMsg, "请填写活动名称（至少 2 字）");
+  if (!timeRaw) return showMsg(editMsg, "请选择活动时间");
+  if (!Number.isInteger(capacity) || capacity < 1) return showMsg(editMsg, "名额需为正整数");
+
+  const btn = document.getElementById("btnSaveEdit");
+  btn.disabled = true;
+  try {
+    const r = await api(`/api/events/${encodeURIComponent(eventId)}`, {
+      method: "PUT",
+      token: sessionToken,
+      body: {
+        name,
+        event_time: timeRaw.replace("T", " "),
+        location: location_,
+        description,
+        capacity,
+      },
+    });
+    currentEvent = r.event;
+    renderEvent(r.event);
+    closeEdit();
+  } catch (err) {
+    showMsg(editMsg, err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById("btnArchive").addEventListener("click", async () => {
+  if (!currentEvent) return;
+  const next = !currentEvent.archived;
+  try {
+    const r = await api(`/api/events/${encodeURIComponent(eventId)}`, {
+      method: "PUT",
+      token: sessionToken,
+      body: { archived: next },
+    });
+    currentEvent = { ...currentEvent, archived: next };
+    renderEvent(currentEvent);
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+document.getElementById("btnDelete").addEventListener("click", async () => {
+  if (!currentEvent) return;
+  if (!confirm("确定删除该活动？删除后将从列表隐藏（数据保留，可恢复）。")) return;
+  try {
+    await api(`/api/events/${encodeURIComponent(eventId)}`, {
+      method: "DELETE",
+      token: sessionToken,
+    });
+    alert("活动已删除");
+    location.href = "/";
+  } catch (err) {
+    alert(err.message);
+  }
+});

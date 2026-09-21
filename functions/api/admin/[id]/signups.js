@@ -26,6 +26,7 @@ export async function onRequestGet({ request, env, params }) {
       capacity: g.ev.capacity,
       taken: g.ev.taken,
       closed: !!g.ev.closed,
+      archived: !!g.ev.archived,
     },
     signups: list,
     stats: { total: list.length, checked: checkedCount, unchecked: list.length - checkedCount },

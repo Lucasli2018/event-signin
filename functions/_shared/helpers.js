@@ -22,6 +22,12 @@ export async function readJson(request) {
 // ============ 活动查询 ============
 export async function getEvent(env, eventId) {
   if (!eventId || typeof eventId !== "string") return null;
+  return env.DB.prepare("SELECT * FROM events WHERE id = ? AND deleted_at IS NULL").bind(eventId).first();
+}
+
+// 不过滤软删除，供管理端查看/恢复已删活动
+export async function getEventRaw(env, eventId) {
+  if (!eventId || typeof eventId !== "string") return null;
   return env.DB.prepare("SELECT * FROM events WHERE id = ?").bind(eventId).first();
 }
 

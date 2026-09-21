@@ -8,8 +8,8 @@ export async function onRequestGet({ request, env }) {
   if (a.error) return fail(a.error, a.status);
 
   const rows = await env.DB.prepare(
-    `SELECT id, name, event_time, location, capacity, taken, closed, created_at
-     FROM events WHERE owner_id = ?
+    `SELECT id, name, event_time, location, capacity, taken, closed, archived, created_at
+     FROM events WHERE owner_id = ? AND deleted_at IS NULL
      ORDER BY created_at DESC, id DESC`
   ).bind(a.account.id).all();
 

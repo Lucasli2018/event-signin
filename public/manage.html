@@ -32,6 +32,11 @@
         <div class="progress-bar"><div class="fill" id="fill"></div></div>
         <div class="progress-text"><span id="takenText"></span><span id="closedText"></span></div>
       </div>
+      <div class="actions">
+        <button class="btn small secondary" id="btnEdit">✏️ 编辑</button>
+        <button class="btn small secondary" id="btnArchive">📦 归档</button>
+        <button class="btn small danger" id="btnDelete">🗑️ 删除</button>
+      </div>
     </div>
 
     <div class="stats">
@@ -81,6 +86,22 @@
   <div class="empty hidden" id="badLink">管理链接无效（缺少 key 或活动不存在）</div>
 
   <div class="footer">活动报名签到 · 管理端</div>
+</div>
+
+<div class="modal hidden" id="editModal">
+  <div class="modal-card">
+    <h2>编辑活动</h2>
+    <div class="msg" id="editMsg"></div>
+    <div class="field"><label>活动名称</label><input id="efName" maxlength="60" placeholder="2-60 字"></div>
+    <div class="field"><label>活动时间</label><input id="efTime" type="datetime-local"></div>
+    <div class="field"><label>地点</label><input id="efLocation" maxlength="120"></div>
+    <div class="field"><label>简介</label><textarea id="efDesc" maxlength="500" rows="3"></textarea></div>
+    <div class="field"><label>名额</label><input id="efCapacity" type="number" min="1" max="100000"></div>
+    <div class="row">
+      <button class="btn" id="btnSaveEdit">保存</button>
+      <button class="btn secondary" id="btnCancelEdit">取消</button>
+    </div>
+  </div>
 </div>
 
 <script src="/vendor/jsQR.js"></script>

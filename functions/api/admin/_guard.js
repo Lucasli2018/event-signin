@@ -7,11 +7,11 @@
 //   if (!g.ok) return g.response;
 //   // g.ev, g.via ('session' | 'account')
 
-import { requireSession, getEvent, json } from "../../_shared/helpers.js";
+import { requireSession, getEventRaw, json } from "../../_shared/helpers.js";
 import { requireAccount } from "../../_shared/account.js";
 
 export async function requireAdmin(request, env, eventId) {
-  const ev = await getEvent(env, eventId);
+  const ev = await getEventRaw(env, eventId);
   if (!ev) return { ok: false, response: json({ error: "活动不存在" }, 404) };
 
   // 1) 旧模式：Bearer admin session

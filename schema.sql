@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS events (
   pin_hash TEXT NOT NULL,             -- HMAC-SHA256(pin, pin_salt)
   pin_salt TEXT NOT NULL,
   closed INTEGER NOT NULL DEFAULT 0,  -- 1 = 停止报名
+  archived INTEGER NOT NULL DEFAULT 0, -- 1 = 已归档（保留数据但隐藏在活跃列表）
+  deleted_at TEXT,                    -- 软删除时间，NULL = 未删
   owner_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,  -- 账号系统：所属组织者（旧活动为 NULL）
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
 );

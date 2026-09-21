@@ -11,6 +11,7 @@
 - 报名成功即得**个人签到二维码**（截图保存）
 - 组织者管理页：PIN 登录、名单实时统计、**摄像头扫码签到**（jsQR）、手机号手动补签、撤销签到、截止/恢复报名
 - 导出 CSV（UTF-8 BOM，Excel 中文不乱码）
+- 活动管理增强：组织者（账号 owner 或旧 PIN 会话）可**编辑**活动（名称/时间/地点/简介/名额，名额不得低于已报名数）、**归档**（保留数据、隐藏于活跃列表）、**软删除**（从列表隐藏，数据可恢复）
 
 ## 技术栈
 
@@ -26,6 +27,7 @@ QR 生成用本地 `vendor/qrcode.min.js`，扫码用本地 `vendor/jsQR.js`，�
 - 登录后进入仪表盘：可集中看到「我的活动」列表，并直接创建 / 管理，**无需记忆管理链接与 PIN**。
 - 登录态下创建的活动自动绑定 `events.owner_id`；管理页（`manage.html?id=...`，不带 key）检测到本账号是 owner 时**免 PIN 直接进**。
 - 账号相关接口：`POST /api/account/register`、`POST /api/account/login`、`POST /api/account/logout`、`GET /api/account/me`、`GET /api/account/events`。
+- 活动编辑 / 删除接口 `PUT|DELETE /api/events/[id]` 同样受 `_guard.js` 保护（旧 PIN 会话或账号 owner 二选一）；软删除后报名 / 签到 / 公开信息查询会因 `getEvent` 过滤而返回 404，管理端用 `getEventRaw` 仍可查看与恢复。
 - 注册 / 登录均带内存 rate-limit（15 分钟 20 次）；密码用与 PIN 相同的 `HMAC-SHA256(password, salt)` 存储。
 - *当前未做邮箱验证（无邮件服务），作为后续增强项。*
 
@@ -54,7 +56,7 @@ functions/
   api/account/me.js        GET 当前账号
   api/account/events.js    GET 我的活动列表
   api/events.js         POST 创建活动（登录态绑定 owner_id，PIN 可选）
-  api/events/[id].js    GET 活动公开信息
+  api/events/[id].js    GET 活动公开信息 / PUT 编辑 / DELETE 软删除（owner 或 PIN 会话）
   api/events/[id]/signup.js  POST 报名（名额并发安全）
   api/admin/_guard.js        管理端守卫（活动存在 + 旧 session 或 账号 owner 二选一）
   api/admin/[id]/auth.js     POST PIN 登录（旧模式）

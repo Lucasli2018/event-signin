@@ -169,3 +169,11 @@ body {
 .ev-actions .btn.small { width: auto; }
 .signup-list li { flex-wrap: wrap; }
 
+/* ===== 编辑 / 归档 / 删除 ===== */
+.actions { display: flex; gap: 8px; margin-top: 14px; }
+.actions .btn { flex: 1; }
+.modal { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+.modal-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; }
+.modal-card h2 { font-size: 17px; margin-bottom: 14px; }
+.modal-card .row { margin-top: 8px; }
+

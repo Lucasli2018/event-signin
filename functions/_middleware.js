@@ -45,6 +45,8 @@ async function ensureDatabase(env) {
         pin_hash TEXT NOT NULL,
         pin_salt TEXT NOT NULL,
         closed INTEGER NOT NULL DEFAULT 0,
+        archived INTEGER NOT NULL DEFAULT 0,
+        deleted_at TEXT,
         owner_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
         created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
       )`,
@@ -77,12 +79,19 @@ async function ensureDatabase(env) {
       const cols = await env.DB.prepare("PRAGMA table_info(events)").all();
       const has = (cols.results || []).some(c => c.name === "owner_id");
       if (!has) {
-        // 仅加可空列（不加 FK 子句，规避部分 SQLite 在 ALTER ADD COLUMN 上对 REFERENCES 的限制）；
-        // 新建库已在 CREATE 中声明外键。账号极少删除，弱引用可接受。
-        await env.DB.prepare(
-          "ALTER TABLE events ADD COLUMN owner_id TEXT"
-        ).run();
+        await env.DB.prepare("ALTER TABLE events ADD COLUMN owner_id TEXT").run();
         console.log("[middleware] 已为 events 表补加 owner_id 列");
+      }
+      // 迁移：补 archived / deleted_at（幂等）
+      const hasArch = (cols.results || []).some(c => c.name === "archived");
+      const hasDel = (cols.results || []).some(c => c.name === "deleted_at");
+      if (!hasArch) {
+        await env.DB.prepare("ALTER TABLE events ADD COLUMN archived INTEGER NOT NULL DEFAULT 0").run();
+        console.log("[middleware] 已为 events 表补加 archived 列");
+      }
+      if (!hasDel) {
+        await env.DB.prepare("ALTER TABLE events ADD COLUMN deleted_at TEXT").run();
+        console.log("[middleware] 已为 events 表补加 deleted_at 列");
       }
     } catch (e) {
       console.error("[middleware] owner_id 迁移失败:", e);
