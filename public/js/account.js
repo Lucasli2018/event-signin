@@ -154,11 +154,53 @@ async function loadEvents() {
       copyBtn.onclick = () => copyText(`${location.origin}/e.html?id=${ev.id}`, copyBtn);
       evList.appendChild(li);
     }
-    await loadTrash();
-    await loadCollab();
   } catch (err) {
     if (err.status === 401) { location.reload(); }
     else { evEmpty.classList.remove("hidden"); evEmpty.textContent = "加载失败：" + err.message; }
+    return; // 主列表都没拉到，不必再拉回收站/协作
+  }
+  // 附属列表各自独立容错：任一失败都不该把主列表标成「加载失败」
+  await loadTrash();
+  await loadCollab();
+}
+
+// 回收站：已软删的活动 + 恢复
+async function loadTrash() {
+  try {
+    const r = await api("/api/account/events?scope=trash");
+    const list = r.events || [];
+    evTrash.innerHTML = "";
+    trashEmpty.classList.toggle("hidden", list.length > 0);
+    for (const ev of list) {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div class="ev-main">
+          <div class="ev-name"></div>
+          <div class="ev-meta">${escapeHtml(ev.event_time)} · 已报 ${ev.taken}/${ev.capacity} · 删除于 ${escapeHtml(String(ev.deleted_at || "").slice(5, 16))}</div>
+        </div>
+        <div class="ev-actions"></div>`;
+      li.querySelector(".ev-name").textContent = ev.name;
+      const restoreBtn = document.createElement("button");
+      restoreBtn.className = "btn small";
+      restoreBtn.type = "button";
+      restoreBtn.textContent = "恢复";
+      restoreBtn.onclick = () => restoreEvent(ev, restoreBtn);
+      li.querySelector(".ev-actions").appendChild(restoreBtn);
+      evTrash.appendChild(li);
+    }
+  } catch { /* 回收站拉取失败不影响其它区块 */ }
+}
+
+async function restoreEvent(ev, btn) {
+  btn.disabled = true;
+  btn.textContent = "恢复中…";
+  try {
+    await api(`/api/events/${encodeURIComponent(ev.id)}/restore`, { method: "POST" });
+    await loadEvents();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = "恢复";
+    alert("恢复失败：" + err.message);
   }
 }
 

@@ -5,8 +5,9 @@
 //   BASE=http://localhost:8789 node scripts/probe-ui.mjs
 //
 // 覆盖：脚本无报错 / 名单渲染 / 公司备注展示 / 筛选生效 / 搜索生效 /
-//       行点击弹签到码且二维码真实渲染 / 撤销按钮不冒泡误触 / 详情卡片回填
-import { spawn } from "node:child_process";
+//       行点击弹签到码且二维码真实渲染 / 撤销按钮不冒泡误触 / 详情卡片回填 /
+//       账号中心我的活动 + 回收站恢复
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -78,26 +79,48 @@ ck("张三已签到", chk.status === 200 && chk.json?.already_checked !== true, 
 // ---------- 1. 起 Chrome ----------
 console.log("\n[1] 启动无头 Chrome");
 const userDataDir = mkdtempSync(join(tmpdir(), "es-ui-probe-"));
-const chrome = spawn(CHROME, [
-  "--headless=new",
-  `--remote-debugging-port=${PORT}`,
-  `--user-data-dir=${userDataDir}`,
-  "--no-first-run", "--no-default-browser-check", "--disable-gpu",
-  "--disable-extensions", "--disable-background-networking",
-  "about:blank",
-], { stdio: "ignore" });
 
+// Chrome 是多进程的，只 kill 主进程会留下僵尸占着调试端口 → 下次启动失败。
+// Windows 用 taskkill /T 连子进程一起收。
+function killChromeTree(proc) {
+  if (!proc || proc.killed) return;
+  if (process.platform === "win32" && proc.pid) {
+    spawnSync("taskkill", ["/F", "/T", "/PID", String(proc.pid)], { stdio: "ignore" });
+  } else {
+    try { proc.kill("SIGKILL"); } catch { /* ignore */ }
+  }
+}
+
+let chrome = null;
 let wsUrl = null;
-for (let i = 0; i < 30 && !wsUrl; i++) {
-  await sleep(500);
-  try {
-    const list = await fetch(`http://127.0.0.1:${PORT}/json/list`).then((r) => r.json());
-    wsUrl = list.find((t) => t.type === "page")?.webSocketDebuggerUrl || null;
-  } catch { /* 还没起来 */ }
+// 调试端口可能被上一轮残留进程占着 → 起不来就换端口重试一次
+for (let attempt = 0; attempt < 2 && !wsUrl; attempt++) {
+  const port = PORT + attempt;
+  chrome = spawn(CHROME, [
+    "--headless=new",
+    `--remote-debugging-port=${port}`,
+    `--user-data-dir=${userDataDir}`,
+    "--no-first-run", "--no-default-browser-check", "--disable-gpu",
+    "--disable-extensions", "--disable-background-networking",
+    "about:blank",
+  ], { stdio: "ignore" });
+
+  for (let i = 0; i < 30 && !wsUrl; i++) {
+    await sleep(500);
+    try {
+      const list = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
+      wsUrl = list.find((t) => t.type === "page")?.webSocketDebuggerUrl || null;
+    } catch { /* 还没起来 */ }
+  }
+  if (!wsUrl) {
+    console.log(`  端口 ${port} 未就绪，清理后重试…`);
+    killChromeTree(chrome);
+    await sleep(1500);
+  }
 }
 if (!wsUrl) {
-  console.log("  Chrome 启动失败，探针中止");
-  chrome.kill();
+  console.log(`  Chrome 启动失败（路径 ${CHROME} 是否存在？端口 ${PORT}+ 是否被占用？），探针中止`);
+  killChromeTree(chrome);
   process.exit(1);
 }
 console.log("  ok   Chrome 已就绪");
@@ -268,16 +291,62 @@ for (let i = 0; i < 30 && extraInputs !== 2; i++) {
 }
 ck("报名页渲染公司/备注输入框（GET fields 已生效）", extraInputs === 2, `got ${extraInputs}`);
 
+// ---------- 8. 账号中心：我的活动 / 回收站恢复 ----------
+console.log("\n[8] 账号中心与回收站");
+const trashEv = await api("/api/events", {
+  method: "POST", cookie,
+  body: { name: `回收站探针${stamp}`, event_time: "2026-12-02 10:00", capacity: 5 },
+});
+const trashName = `回收站探针${stamp}`;
+await api(`/api/events/${trashEv.json?.id}`, { method: "DELETE", cookie });
+
+await send("Page.navigate", { url: `${BASE}/account.html` });
+let mainRows = 0;
+for (let i = 0; i < 40 && mainRows < 1; i++) {
+  await sleep(400);
+  try { mainRows = await evaluate("return document.querySelectorAll('#evList li').length"); } catch { mainRows = 0; }
+}
+ck("账号中心「我的活动」渲染", mainRows >= 1, `got ${mainRows}`);
+
+const accErrs = await evaluate("return window.__errs");
+ck("账号中心无 JS 报错（loadTrash 已定义）", Array.isArray(accErrs) && accErrs.length === 0, JSON.stringify(accErrs));
+
+// 附属列表加载失败不应污染主列表的错误提示
+const emptyText = await evaluate("return (document.getElementById('evEmpty') || {}).textContent || ''");
+ck("「我的活动」未误报加载失败", !emptyText.includes("加载失败"), emptyText);
+
+let trashRows = 0;
+for (let i = 0; i < 20 && trashRows < 1; i++) {
+  await sleep(300);
+  try { trashRows = await evaluate("return document.querySelectorAll('#evTrash li').length"); } catch { trashRows = 0; }
+}
+ck("回收站列出已删活动", trashRows >= 1, `got ${trashRows}`);
+
+const canRestore = await evaluate("return document.querySelectorAll('#evTrash li .ev-actions button').length");
+ck("回收站项带「恢复」按钮", canRestore >= 1, `got ${canRestore}`);
+
+await evaluate("document.querySelector('#evTrash li .ev-actions button').click(); return 1");
+let restored = false;
+for (let i = 0; i < 30 && !restored; i++) {
+  await sleep(400);
+  try {
+    restored = await evaluate(
+      `return [...document.querySelectorAll('#evList .ev-name')].some(e => e.textContent.includes(${JSON.stringify(trashName)}))`);
+  } catch { restored = false; }
+}
+ck("点「恢复」后活动回到我的活动列表", restored === true);
+
 // ---------- 收尾 ----------
 try { ws.close(); } catch { /* ignore */ }
-chrome.kill();
-await sleep(500);
+killChromeTree(chrome);
+await sleep(800);
 try { rmSync(userDataDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
 // 清理测试数据
 try {
   await api(`/api/events/${evId}`, { method: "DELETE", cookie });
-  console.log("\n[8] 测试活动已软删");
+  if (trashEv.json?.id) await api(`/api/events/${trashEv.json.id}`, { method: "DELETE", cookie });
+  console.log("\n[9] 测试活动已软删");
 } catch { /* ignore */ }
 
 console.log(`\n===== pass=${pass} fail=${fail} =====`);
