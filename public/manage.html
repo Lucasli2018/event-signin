@@ -45,6 +45,18 @@
       <div class="stat-card"><div class="num" id="stUnchecked">0</div><div class="lbl">未签到</div></div>
     </div>
 
+    <div class="dashboard card">
+      <h3>📊 签到看板</h3>
+      <div class="checkin-rate">
+        <div class="progress-bar"><div class="fill" id="checkinFill"></div></div>
+        <div class="progress-text"><span id="checkinRateText"></span></div>
+      </div>
+      <div class="dist">
+        <div class="dist-title">签到时段分布</div>
+        <div id="distBars"></div>
+      </div>
+    </div>
+
     <div class="tabs">
       <button id="tabScan" class="active">📷 扫码签到</button>
       <button id="tabList">📃 名单</button>

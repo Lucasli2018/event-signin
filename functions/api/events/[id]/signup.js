@@ -18,9 +18,13 @@ export async function onRequestPost({ request, env, params }) {
 
   const name = String(body.name || "").trim();
   const phone = String(body.phone || "").trim();
+  const company = body.company !== undefined ? String(body.company || "").trim() : "";
+  const remark = body.remark !== undefined ? String(body.remark || "").trim() : "";
 
   if (name.length < 1 || name.length > 30) return fail("姓名需 1-30 字");
   if (!isValidPhone(phone)) return fail("手机号格式不正确");
+  if (company.length > 60) return fail("公司名最长 60 字");
+  if (remark.length > 200) return fail("备注最长 200 字");
 
   // 重复报名快速提示（最终防线仍是 UNIQUE 约束）
   const dup = await env.DB.prepare(
@@ -40,8 +44,8 @@ export async function onRequestPost({ request, env, params }) {
   const token = genToken(16);
   try {
     await env.DB.prepare(
-      "INSERT INTO signups (event_id, name, phone, token) VALUES (?, ?, ?, ?)"
-    ).bind(ev.id, name, phone, token).run();
+      "INSERT INTO signups (event_id, name, phone, token, company, remark) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(ev.id, name, phone, token, company || null, remark || null).run();
   } catch (err) {
     // 回退占位
     await env.DB.prepare(

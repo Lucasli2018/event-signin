@@ -1,6 +1,7 @@
 // 报名页：加载活动信息 → 提交报名 → 展示个人签到二维码
 const eventId = getQuery("id");
 const msg = document.getElementById("msg");
+let eventFields = {};
 
 function showSuccess(token, name, duplicated) {
   const payload = JSON.stringify({ t: token });
@@ -47,6 +48,16 @@ async function loadEvent() {
 
     document.getElementById("eventCard").style.display = "";
 
+    eventFields = ev.fields || {};
+    const extraBox = document.getElementById("extraFields");
+    extraBox.innerHTML = "";
+    if (eventFields.company) {
+      extraBox.insertAdjacentHTML("beforeend", `<div class="field"><label>公司</label><input id="fCompany" maxlength="60" placeholder="选填"></div>`);
+    }
+    if (eventFields.remark) {
+      extraBox.insertAdjacentHTML("beforeend", `<div class="field"><label>备注</label><input id="fRemark" maxlength="200" placeholder="选填"></div>`);
+    }
+
     if (ev.closed || ev.remaining <= 0) {
       document.getElementById("closedCard").classList.remove("hidden");
       if (ev.remaining <= 0 && !ev.closed) {
@@ -78,9 +89,13 @@ document.getElementById("btnSignup").addEventListener("click", async () => {
   btn.disabled = true;
   btn.textContent = "提交中…";
   try {
+    const extra = {};
+    if (eventFields.company) extra.company = document.getElementById("fCompany").value.trim();
+    if (eventFields.remark) extra.remark = document.getElementById("fRemark").value.trim();
+
     const r = await api(`/api/events/${encodeURIComponent(eventId)}/signup`, {
       method: "POST",
-      body: { name, phone },
+      body: { name, phone, ...extra },
     });
     showSuccess(r.token, r.name, !!r.duplicated);
   } catch (err) {

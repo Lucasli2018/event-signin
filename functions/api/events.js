@@ -47,14 +47,15 @@ export async function onRequestPost({ request, env }) {
   const pinHash = await hashPassword(realPin, pinSalt);
 
   await env.DB.prepare(
-    `INSERT INTO events (id, name, event_time, location, description, capacity, admin_key, pin_hash, pin_salt, owner_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(id, name, eventTime, location || null, description || null, capacity, adminKey, pinHash, pinSalt, ownerId).run();
+    `INSERT INTO events (id, name, event_time, location, description, capacity, admin_key, pin_hash, pin_salt, owner_id, fields)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(id, name, eventTime, location || null, description || null, capacity, adminKey, pinHash, pinSalt, ownerId, fieldsJson).run();
 
   return json({
     id,
     admin_key: adminKey,
     owner: !!ownerId,
+    fields: fieldsObj,
     signup_path: `/e.html?id=${id}`,
     manage_path: ownerId ? `/manage.html?id=${id}` : `/manage.html?id=${id}&key=${adminKey}`,
   }, 201);

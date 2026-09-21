@@ -47,8 +47,11 @@ export async function onRequestPut({ request, env, params }) {
   if (description.length > 500) return fail("简介最长 500 字");
 
   await env.DB.prepare(
-    `UPDATE events SET name=?, event_time=?, location=?, description=?, capacity=?, archived=? WHERE id=?`
-  ).bind(name, eventTime, location || null, description || null, capacityRaw, archived, ev.id).run();
+    `UPDATE events SET name=?, event_time=?, location=?, description=?, capacity=?, archived=?, fields=? WHERE id=?`
+  ).bind(name, eventTime, location || null, description || null, capacityRaw, archived, fieldsJson, ev.id).run();
+
+  let outFields = {};
+  try { outFields = fieldsJson ? JSON.parse(fieldsJson) : {}; } catch (_) {}
 
   return json({
     ok: true,
@@ -56,6 +59,7 @@ export async function onRequestPut({ request, env, params }) {
       id: ev.id, name, event_time: eventTime, location: location || null,
       description: description || null, capacity: capacityRaw, taken: ev.taken,
       remaining: Math.max(0, capacityRaw - ev.taken), closed: !!ev.closed, archived: !!archived,
+      fields: outFields,
     },
   });
 }

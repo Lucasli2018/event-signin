@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS events (
   archived INTEGER NOT NULL DEFAULT 0, -- 1 = 已归档（保留数据但隐藏在活跃列表）
   deleted_at TEXT,                    -- 软删除时间，NULL = 未删
   owner_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,  -- 账号系统：所属组织者（旧活动为 NULL）
+  fields TEXT,                      -- 报名自定义字段定义（JSON: {"company":bool,"remark":bool}）
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
 );
 
@@ -43,6 +44,8 @@ CREATE TABLE IF NOT EXISTS signups (
   phone TEXT NOT NULL,
   token TEXT NOT NULL UNIQUE,         -- 签到码内容（16 字节 hex）
   checked_in_at TEXT,                 -- NULL = 未签到
+  company TEXT,                       -- 报名自定义字段：公司（可选）
+  remark TEXT,                        -- 报名自定义字段：备注（可选）
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
   UNIQUE(event_id, phone)             -- 同活动同手机号防重复报名
 );

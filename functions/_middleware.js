@@ -48,6 +48,7 @@ async function ensureDatabase(env) {
         archived INTEGER NOT NULL DEFAULT 0,
         deleted_at TEXT,
         owner_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+        fields TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
       )`,
       `CREATE TABLE IF NOT EXISTS signups (
@@ -57,6 +58,8 @@ async function ensureDatabase(env) {
         phone TEXT NOT NULL,
         token TEXT NOT NULL UNIQUE,
         checked_in_at TEXT,
+        company TEXT,
+        remark TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
         UNIQUE(event_id, phone)
       )`,

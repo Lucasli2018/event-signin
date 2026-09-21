@@ -12,6 +12,10 @@ btn.addEventListener("click", async () => {
   const capacity = Number(document.getElementById("fCapacity").value);
   const pin = document.getElementById("fPin").value.trim();
 
+  const fields = {};
+  if (document.getElementById("fFieldCompany").checked) fields.company = true;
+  if (document.getElementById("fFieldRemark").checked) fields.remark = true;
+
   if (name.length < 2) return showMsg(msg, "请填写活动名称（至少 2 字）");
   if (!timeRaw) return showMsg(msg, "请选择活动时间");
   if (!Number.isInteger(capacity) || capacity < 1) return showMsg(msg, "名额需为正整数");
@@ -24,7 +28,7 @@ btn.addEventListener("click", async () => {
   try {
     const r = await api("/api/events", {
       method: "POST",
-      body: { name, event_time: eventTime, location: location_, description, capacity, pin },
+      body: { name, event_time: eventTime, location: location_, description, capacity, pin, fields },
     });
 
     const origin = window.location.origin;

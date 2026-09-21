@@ -60,7 +60,7 @@ functions/
   api/events/[id]/signup.js  POST 报名（名额并发安全）
   api/admin/_guard.js        管理端守卫（活动存在 + 旧 session 或 账号 owner 二选一）
   api/admin/[id]/auth.js     POST PIN 登录（旧模式）
-  api/admin/[id]/signups.js  GET 名单+统计
+  api/admin/[id]/signups.js  GET 名单+统计（含 company/remark 与按小时签到分布）
   api/admin/[id]/checkin.js  POST 签到（token/手机号，幂等）
   api/admin/[id]/uncheck.js  POST 撤销签到
   api/admin/[id]/close.js    POST 截止/恢复报名

@@ -177,3 +177,16 @@ body {
 .modal-card h2 { font-size: 17px; margin-bottom: 14px; }
 .modal-card .row { margin-top: 8px; }
 
+/* ===== 签到看板 ===== */
+.dashboard h3 { font-size: 15px; margin-bottom: 12px; }
+.checkin-rate { margin-bottom: 14px; }
+.dist-title { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.dist-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 13px; }
+.dist-bucket { width: 72px; flex-shrink: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dist-bar { flex: 1; height: 12px; background: #e8edf6; border-radius: 99px; overflow: hidden; }
+.dist-fill { display: block; height: 100%; background: var(--success); border-radius: 99px; transition: width .3s; }
+.dist-count { width: 28px; text-align: right; font-weight: 600; color: var(--text); }
+.signup-list .extra { width: 100%; flex-basis: 100%; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.checkbox { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text); margin: 4px 16px 4px 0; cursor: pointer; }
+.checkbox input { width: auto; }
+

@@ -75,6 +75,7 @@ async function refreshList() {
     document.getElementById("stTotal").textContent = r.stats.total;
     document.getElementById("stChecked").textContent = r.stats.checked;
     document.getElementById("stUnchecked").textContent = r.stats.unchecked;
+    renderDashboard(r.stats);
 
     const ul = document.getElementById("list");
     ul.innerHTML = "";
@@ -114,6 +115,45 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+function extraText(s) {
+  const parts = [];
+  if (s.company) parts.push("公司：" + escapeHtml(s.company));
+  if (s.remark) parts.push("备注：" + escapeHtml(s.remark));
+  return parts.join(" · ");
+}
+
+// 签到看板：签到率进度条 + 按时段分布条形图
+function renderDashboard(stats) {
+  const total = stats.total || 0;
+  const checked = stats.checked || 0;
+  const rate = total ? Math.round((checked / total) * 100) : 0;
+  const fill = document.getElementById("checkinFill");
+  const txt = document.getElementById("checkinRateText");
+  if (fill) fill.style.width = rate + "%";
+  if (txt) txt.textContent = `签到率 ${rate}%（${checked}/${total}）`;
+
+  const dist = stats.checkin_distribution || [];
+  const bars = document.getElementById("distBars");
+  if (!bars) return;
+  bars.innerHTML = "";
+  if (!dist.length) {
+    bars.innerHTML = '<div class="empty" style="padding:10px 0">暂无签到记录</div>';
+    return;
+  }
+  const max = Math.max(...dist.map((d) => d.count));
+  for (const d of dist) {
+    const row = document.createElement("div");
+    row.className = "dist-row";
+    const pct = max ? (d.count / max) * 100 : 0;
+    row.innerHTML = `
+      <span class="dist-bucket">${escapeHtml(d.bucket.slice(5))}</span>
+      <span class="dist-bar"><span class="dist-fill" style="width:${pct}%"></span></span>
+      <span class="dist-count">${d.count}</span>
+    `;
+    bars.appendChild(row);
+  }
 }
 
 async function uncheck(signupId) {
