@@ -5,3 +5,8 @@
 .tmp-shots/
 node_modules/
 .init-out.txt
+
+# Cloudflare 凭据（含 D1 API Token，切勿提交）
+.cf_token
+.env
+.env.local
