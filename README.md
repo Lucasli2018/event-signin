@@ -14,6 +14,12 @@
 - 活动管理增强：组织者（账号 owner 或旧 PIN 会话）可**编辑**活动（名称/时间/地点/简介/名额，名额不得低于已报名数）、**归档**（保留数据、隐藏于活跃列表）、**软删除**（从列表隐藏，数据可恢复）
 - **分享海报**：报名页 / 管理页一键生成珊瑚橙活动海报（含报名二维码、时间/地点/名额），可**保存 PNG** 转发到微信群；把报名链接分享到微信/群时自动生成 **OG 预览卡片**（`/e.html` 动态注入标题 / 时间地点 / 封面图）
 
+### 活动广场（公开发现）
+- 新增 `/plaza.html`：**所有人无需登录**即可浏览所有公开活动（未删除 / 未归档 / 且组织者未隐藏）。
+- 支持**条件搜索**：关键词（名称 / 地点 / 简介）、状态（即将开始 / 已结束 / 全部）、排序（时间最早 / 最晚 / 最新发布）、**仅看有名额**开关；分页「加载更多」。
+- 后端 `GET /api/plaza` 只返回公开字段（id / 名称 / 时间 / 地点 / 简介 / 名额 / 已报 / 组织者昵称），**绝不泄露管理密钥 / PIN / owner**；关键词用参数化 `LIKE` 防注入。
+- 组织者可在管理页「编辑」弹窗勾选 **在活动广场公开展示**（写入 `events.listed`，默认 1；取消后从广场隐藏，但仍可通过报名链接正常报名）。
+
 ## 技术栈
 
 Cloudflare Pages（静态，纯 HTML + 原生 JS 零构建）+ Pages Functions（API）+ D1（SQLite）。
@@ -45,8 +51,10 @@ QR 生成用本地 `vendor/qrcode.min.js`，扫码用本地 `vendor/jsQR.js`，�
 ```
 public/                 静态前端
   index.html            创建活动
+  plaza.html            活动广场（公开浏览 + 条件搜索，无需登录）
   e.html                报名页（含个人签到二维码 + 分享海报入口）
   manage.html           管理页（扫码/名单/导出/分享海报）
+  js/plaza.js           活动广场拉取与筛选逻辑
   js/poster.js          Canvas 分享海报生成（含二维码，支持保存 PNG / 复制链接）
   og-default.png        分享预览封面图（1200x630，珊瑚橙品牌）
   vendor/               qrcode.min.js / jsQR.js
@@ -60,6 +68,7 @@ functions/
   api/account/events.js    GET 我的活动列表
   api/events.js         POST 创建活动（登录态绑定 owner_id，PIN 可选）
   api/events/[id].js    GET 活动公开信息 / PUT 编辑 / DELETE 软删除（owner 或 PIN 会话）
+  api/plaza.js          GET 活动广场公开列表（关键词/状态/排序/仅看有名额/分页，无需登录）
   api/events/[id]/signup.js  POST 报名（名额并发安全）
   api/admin/_guard.js        管理端守卫（活动存在 + 旧 session 或 账号 owner 二选一）
   api/admin/[id]/auth.js     POST PIN 登录（旧模式）

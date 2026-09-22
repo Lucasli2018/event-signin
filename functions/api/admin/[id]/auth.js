@@ -66,6 +66,7 @@ export async function onRequestPost({ request, env, params }) {
       capacity: ev.capacity,
       taken: ev.taken,
       closed: !!ev.closed,
+      listed: !!ev.listed,
     },
     expiresIn: 86400,
   });

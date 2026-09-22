@@ -19,6 +19,7 @@ export async function onRequestGet({ env, params }) {
     taken: ev.taken,
     remaining: Math.max(0, ev.capacity - ev.taken),
     closed: !!ev.closed,
+    listed: !!ev.listed,
     // 报名页据此渲染需要额外收集的字段
     fields: parseEventFields(ev.fields),
   });
@@ -38,6 +39,8 @@ export async function onRequestPut({ request, env, params }) {
   const description = body.description !== undefined ? String(body.description ?? "").trim() : (ev.description || "");
   const capacityRaw = body.capacity !== undefined ? Number(body.capacity) : ev.capacity;
   const archived = body.archived !== undefined ? (body.archived ? 1 : 0) : (ev.archived ? 1 : 0);
+  // 广场可见性：提供 body.listed 才更新，否则保留原值（默认 1）
+  const listed = body.listed !== undefined ? (body.listed ? 1 : 0) : (ev.listed ? 1 : 0);
 
   // 报名自定义字段：提供 body.fields 才更新，否则保留原配置；白名单过滤
   let fieldsJson = ev.fields;
@@ -58,8 +61,8 @@ export async function onRequestPut({ request, env, params }) {
   if (description.length > 500) return fail("简介最长 500 字");
 
   await env.DB.prepare(
-    `UPDATE events SET name=?, event_time=?, location=?, description=?, capacity=?, archived=?, fields=? WHERE id=?`
-  ).bind(name, eventTime, location || null, description || null, capacityRaw, archived, fieldsJson, ev.id).run();
+    `UPDATE events SET name=?, event_time=?, location=?, description=?, capacity=?, archived=?, listed=?, fields=? WHERE id=?`
+  ).bind(name, eventTime, location || null, description || null, capacityRaw, archived, listed, fieldsJson, ev.id).run();
 
   return json({
     ok: true,
@@ -67,6 +70,7 @@ export async function onRequestPut({ request, env, params }) {
       id: ev.id, name, event_time: eventTime, location: location || null,
       description: description || null, capacity: capacityRaw, taken: ev.taken,
       remaining: Math.max(0, capacityRaw - ev.taken), closed: !!ev.closed, archived: !!archived,
+      listed: !!listed,
       fields: outFields,
     },
   });

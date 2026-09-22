@@ -4,6 +4,25 @@ import { buildOgMeta, injectOgMeta } from "./_shared/og.js";
 
 let dbReady = false;
 let initializing = false;
+let listedMigrated = false;
+
+// 广场可见性开关列：已部署的旧库可能缺该列，首访（无论表是否新建）幂等补上，
+// 否则 /api/plaza 的 SELECT e.listed 会报错。仅执行一次（per worker 实例）。
+async function ensureListedColumn(env) {
+  if (listedMigrated) return;
+  try {
+    const cols = await env.DB.prepare("PRAGMA table_info(events)").all();
+    const has = (cols.results || []).some(c => c.name === "listed");
+    if (!has) {
+      await env.DB.prepare("ALTER TABLE events ADD COLUMN listed INTEGER NOT NULL DEFAULT 1").run();
+      console.log("[middleware] 已为 events 表补加 listed 列");
+    }
+  } catch (e) {
+    console.error("[middleware] listed 迁移失败:", e);
+    return; // 失败不阻塞请求，也避免反复重试
+  }
+  listedMigrated = true;
+}
 
 async function ensureDatabase(env) {
   if (dbReady || initializing) return;
@@ -51,6 +70,7 @@ async function ensureDatabase(env) {
         deleted_at TEXT,
         owner_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
         fields TEXT,
+        listed INTEGER NOT NULL DEFAULT 1, -- 1 = 在活动广场公开；0 = 组织者隐藏
         created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
       )`,
       `CREATE TABLE IF NOT EXISTS signups (
@@ -141,6 +161,7 @@ export async function onRequest(context) {
   }
 
   await ensureDatabase(env);
+  await ensureListedColumn(env);
 
   const originalNext = context.next;
   context.next = async (nextContext) => {

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS events (
   deleted_at TEXT,                    -- 软删除时间，NULL = 未删
   owner_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,  -- 账号系统：所属组织者（旧活动为 NULL）
   fields TEXT,                      -- 报名自定义字段定义（JSON: {"company":bool,"remark":bool}）
+  listed INTEGER NOT NULL DEFAULT 1, -- 1 = 在活动广场公开；0 = 组织者隐藏
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
 );
 

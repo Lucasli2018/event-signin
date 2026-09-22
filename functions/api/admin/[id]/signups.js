@@ -41,6 +41,7 @@ export async function onRequestGet({ request, env, params }) {
       taken: g.ev.taken,
       closed: !!g.ev.closed,
       archived: !!g.ev.archived,
+      listed: !!g.ev.listed,
       deleted_at: g.ev.deleted_at,
     },
     signups: list,

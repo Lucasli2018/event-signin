@@ -82,6 +82,7 @@ function renderEvent(ev) {
       <div><strong>剩余名额</strong> ${remain}</div>
       <div><strong>活动时间</strong> ${escapeHtml(ev.event_time || "-")}</div>
       <div><strong>地点</strong> ${escapeHtml(ev.location || "-")}</div>
+      <div><strong>广场展示</strong> ${ev.listed === false ? "已隐藏" : "公开中"}</div>
     `;
   }
 }
@@ -568,6 +569,7 @@ function openEdit() {
   document.getElementById("efLocation").value = currentEvent.location || "";
   document.getElementById("efDesc").value = currentEvent.description || "";
   document.getElementById("efCapacity").value = currentEvent.capacity || 1;
+  document.getElementById("efListed").checked = currentEvent.listed !== false;
   hideMsg(editMsg);
   editModal.classList.remove("hidden");
 }
@@ -598,6 +600,7 @@ document.getElementById("btnSaveEdit").addEventListener("click", async () => {
   const location_ = document.getElementById("efLocation").value.trim();
   const description = document.getElementById("efDesc").value.trim();
   const capacity = Number(document.getElementById("efCapacity").value);
+  const listed = document.getElementById("efListed").checked;
 
   if (name.length < 2) return showMsg(editMsg, "请填写活动名称（至少 2 字）");
   if (!timeRaw) return showMsg(editMsg, "请选择活动时间");
@@ -615,6 +618,7 @@ document.getElementById("btnSaveEdit").addEventListener("click", async () => {
         location: location_,
         description,
         capacity,
+        listed,
       },
     });
     currentEvent = r.event;
