@@ -2,59 +2,14 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="refresh" content="0;url=/">
 <title>活动广场 - 活动报名签到</title>
-<link rel="stylesheet" href="/css/style.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/favicon.svg">
-<meta name="theme-color" content="#FF7A45">
 </head>
 <body>
-<div class="container">
-  <div class="header plaza-header">
-    <h1>🏛️ 活动广场</h1>
-    <div class="sub">发现并报名感兴趣的活动，所有人都能来逛</div>
-  </div>
-  <div class="topnav"><a href="/">＋ 创建活动</a> · <a href="/account.html">我的账号</a></div>
-
-  <!-- 搜索 + 筛选 -->
-  <div class="card" id="filterCard">
-    <div class="search-bar">
-      <input id="fQ" type="search" maxlength="60" placeholder="搜索活动名称 / 地点 / 关键词">
-      <button class="btn small coral" id="btnSearch">搜索</button>
-    </div>
-    <div class="filter-bar">
-      <div class="chips" id="statusChips">
-        <button class="chip active" data-status="all">全部</button>
-        <button class="chip" data-status="upcoming">即将开始</button>
-        <button class="chip" data-status="past">已结束</button>
-      </div>
-      <div class="filter-right">
-        <select id="sortSelect" class="sort-select">
-          <option value="time_asc">时间最早优先</option>
-          <option value="time_desc">时间最晚优先</option>
-          <option value="newest">最新发布</option>
-        </select>
-        <label class="checkbox"><input type="checkbox" id="fHasSpots"> 仅看有名额</label>
-      </div>
-    </div>
-  </div>
-
-  <!-- 结果计数 -->
-  <div class="plaza-count" id="plazaCount"></div>
-
-  <!-- 列表 -->
-  <div id="listWrap"></div>
-  <div class="empty hidden" id="emptyTip">没有符合条件的活动，换个关键词或筛选试试～</div>
-  <div class="loading hidden" id="loadingTip">加载中…</div>
-
-  <!-- 加载更多 -->
-  <button class="btn secondary load-more hidden" id="btnMore">加载更多</button>
-
-  <div class="footer">活动报名签到 · 活动广场</div>
-</div>
-
-<script src="/js/api.js"></script>
-<script src="/js/plaza.js"></script>
+<p style="text-align:center;padding:48px;font-family:-apple-system,Segoe UI,sans-serif;color:#FF7A45">
+  正在跳转到活动广场… 若未自动跳转，请<a href="/">点击这里</a>。
+</p>
+<script>location.href="/";</script>
 </body>
 </html>
