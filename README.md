@@ -25,6 +25,23 @@
 Cloudflare Pages（静态，纯 HTML + 原生 JS 零构建）+ Pages Functions（API）+ D1（SQLite）。
 QR 生成用本地 `vendor/qrcode.min.js`，扫码用本地 `vendor/jsQR.js`，无外部 CDN 依赖。
 
+## 数据源（D1）
+
+后端使用 Cloudflare D1。本项目接入**共享 `dev` 库**（`database_name` / `database_id` 见 `wrangler.toml`），与 linguaverse-web（`lv_`）、workbench-mobile（`wbm_`）等共用同一 D1 实例。
+
+为避免同库表名 / 索引名冲突，本项目**所有表与索引均带 `es_` 前缀**：
+
+| 逻辑表 | 实际表名 |
+| --- | --- |
+| accounts | es_accounts |
+| account_sessions | es_account_sessions |
+| events | es_events |
+| signups | es_signups |
+| admin_sessions | es_admin_sessions |
+| event_collaborators | es_event_collaborators |
+
+索引统一前缀 `es_idx_*`。`schema.sql`、`_middleware.js` 的自动建表 / 迁移逻辑、所有后端 API，以及 `scripts/` 下的 `init-d1.mjs` / `seed-events.mjs` / `probe-e2e.mjs` 查库脚本均已同步该前缀；前端路由（`/api/events` 等）与 JSON 字段名不受影响。
+
 ## 鉴权模型
 
 系统支持**两套并列的鉴权方式**，互不冲突：
@@ -89,7 +106,7 @@ schema.sql              参考 schema（middleware 会自动幂等建表）
 ## 本地开发
 
 ```bash
-wrangler pages dev public --port 8788 --d1 DB=event-signin-db
+wrangler pages dev public --port 8788 --d1 DB=dev
 ```
 
 打开 http://localhost:8788 。首次访问 API 时 middleware 自动建表，无需手动迁移。
@@ -106,7 +123,7 @@ CLOUDFLARE_API_TOKEN=<token> node scripts/init-d1.mjs --create
 ## 部署
 
 ```bash
-# 1. D1 已建好（event-signin-db，id 见 wrangler.toml）
+# 1. D1 已建好（共享 dev 库，database_id 见 wrangler.toml）
 # 2. 远端建表
 CLOUDFLARE_API_TOKEN=<token> node scripts/init-d1.mjs
 # 3. 部署（wrangler.toml 里的 [[d1_databases]] 会随部署同步为 Pages 的 D1 绑定）
@@ -123,7 +140,7 @@ BASE=http://localhost:8788 node scripts/probe-ui.mjs
 ## 当前线上
 
 - 站点：https://event-signin.pages.dev
-- D1：`event-signin-db` (11405d6f-4f4a-4927-893b-29cbc0549478)
+- D1：共享 `dev` 库 (3c83aee3-4645-450b-b50b-6488750deeb4)，所有表带 `es_` 前缀（与同库 linguaverse 的 `lv_`、workbench 的 `wbm_` 同约定，避免撞名）
 - `probe-e2e.mjs`（110 项）覆盖：404 / 创建 / 参数校验 / 公开信息脱敏 / 报名幂等 / 满员 410 / 错误 key 403 / 错误 PIN 401 / 登录 / 名单统计 / 扫码签到幂等 / 手机号补签 / 撤销 / CSV(BOM) / 截止报名 / 编辑 / 软删 / 回收站 / 恢复 / 协作 / 报名自定义字段(company/remark) / 动态 OG meta / 品牌封面图 / 静态页可达
 - `probe-ui.mjs`（26 项）覆盖：脚本无报错 / QRCode 库加载 / 名单渲染 / 公司备注展示 / 筛选与搜索 / 行点击弹签到码且二维码真实渲染 / 撤销按钮事件隔离 / 详情卡片回填 / 报名页字段联动
 
