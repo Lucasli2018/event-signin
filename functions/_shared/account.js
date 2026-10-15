@@ -69,18 +69,18 @@ export async function requireAccount(request, env) {
   if (!token) return { error: "未登录", status: 401 };
 
   const session = await env.DB.prepare(
-    "SELECT * FROM account_sessions WHERE token = ?"
+    "SELECT * FROM es_account_sessions WHERE token = ?"
   ).bind(token).first();
   if (!session) return { error: "会话无效", status: 401 };
 
   const now = nowFullString();
   if (session.expires_at < now) {
-    await env.DB.prepare("DELETE FROM account_sessions WHERE token = ?").bind(token).run();
+    await env.DB.prepare("DELETE FROM es_account_sessions WHERE token = ?").bind(token).run();
     return { error: "会话已过期", status: 401 };
   }
 
   const account = await env.DB.prepare(
-    "SELECT id, email, display_name FROM accounts WHERE id = ?"
+    "SELECT id, email, display_name FROM es_accounts WHERE id = ?"
   ).bind(session.account_id).first();
   if (!account) return { error: "账号不存在", status: 401 };
 
@@ -93,7 +93,7 @@ export async function registerAccount(env, email, password, displayName) {
   const salt = genSalt(16);
   const pwHash = await hashPassword(password, salt);
   await env.DB.prepare(
-    `INSERT INTO accounts (id, email, display_name, pw_hash, pw_salt, created_at)
+    `INSERT INTO es_accounts (id, email, display_name, pw_hash, pw_salt, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).bind(id, email, displayName || null, pwHash, salt, nowFullString()).run();
   return id;
@@ -102,7 +102,7 @@ export async function registerAccount(env, email, password, displayName) {
 // ============ 登录 ============
 export async function loginAccount(env, email, password) {
   const account = await env.DB.prepare(
-    "SELECT * FROM accounts WHERE email = ?"
+    "SELECT * FROM es_accounts WHERE email = ?"
   ).bind(email).first();
   if (!account) return null;
   const ok = await verifyPassword(password, account.pw_salt, account.pw_hash);
@@ -118,11 +118,11 @@ export async function createSession(env, accountId) {
   const expiresLocal = formatLocalFull(new Date(Date.now() + SESSION_TTL_DAYS * 86400 * 1000));
 
   await env.DB.prepare(
-    "INSERT INTO account_sessions (token, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)"
+    "INSERT INTO es_account_sessions (token, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)"
   ).bind(token, accountId, now, expiresLocal).run();
 
   // 顺手清理过期会话
-  await env.DB.prepare("DELETE FROM account_sessions WHERE expires_at < ?").bind(now).run();
+  await env.DB.prepare("DELETE FROM es_account_sessions WHERE expires_at < ?").bind(now).run();
 
   return { token, expiresISO };
 }

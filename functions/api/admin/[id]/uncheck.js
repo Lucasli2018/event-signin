@@ -13,7 +13,7 @@ export async function onRequestPost({ request, env, params }) {
   if (!Number.isInteger(signupId) || signupId <= 0) return fail("缺少 signup_id");
 
   const r = await env.DB.prepare(
-    "UPDATE signups SET checked_in_at = NULL WHERE id = ? AND event_id = ?"
+    "UPDATE es_signups SET checked_in_at = NULL WHERE id = ? AND event_id = ?"
   ).bind(signupId, g.ev.id).run();
 
   if (!r.meta.changes) return fail("记录不存在", 404);

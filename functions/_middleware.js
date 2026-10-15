@@ -11,10 +11,10 @@ let listedMigrated = false;
 async function ensureListedColumn(env) {
   if (listedMigrated) return;
   try {
-    const cols = await env.DB.prepare("PRAGMA table_info(events)").all();
+    const cols = await env.DB.prepare("PRAGMA table_info(es_events)").all();
     const has = (cols.results || []).some(c => c.name === "listed");
     if (!has) {
-      await env.DB.prepare("ALTER TABLE events ADD COLUMN listed INTEGER NOT NULL DEFAULT 1").run();
+      await env.DB.prepare("ALTER TABLE es_events ADD COLUMN listed INTEGER NOT NULL DEFAULT 1").run();
       console.log("[middleware] 已为 events 表补加 listed 列");
     }
   } catch (e) {
@@ -28,7 +28,7 @@ async function ensureDatabase(env) {
   if (dbReady || initializing) return;
   try {
     const result = await env.DB.prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='events'"
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='es_events'"
     ).first();
     if (result) {
       dbReady = true;
@@ -39,7 +39,7 @@ async function ensureDatabase(env) {
     console.log("[middleware] 首次访问，初始化数据库 schema…");
 
     const statements = [
-      `CREATE TABLE IF NOT EXISTS accounts (
+      `CREATE TABLE IF NOT EXISTS es_accounts (
         id TEXT PRIMARY KEY,
         email TEXT NOT NULL UNIQUE,
         display_name TEXT,
@@ -47,14 +47,14 @@ async function ensureDatabase(env) {
         pw_salt TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
       )`,
-      `CREATE TABLE IF NOT EXISTS account_sessions (
+      `CREATE TABLE IF NOT EXISTS es_account_sessions (
         token TEXT PRIMARY KEY,
-        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        account_id TEXT NOT NULL REFERENCES es_accounts(id) ON DELETE CASCADE,
         created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
         expires_at TEXT NOT NULL
       )`,
-      `CREATE INDEX IF NOT EXISTS idx_account_sessions_acct ON account_sessions(account_id, expires_at)`,
-      `CREATE TABLE IF NOT EXISTS events (
+      `CREATE INDEX IF NOT EXISTS es_idx_account_sessions_acct ON es_account_sessions(account_id, expires_at)`,
+      `CREATE TABLE IF NOT EXISTS es_events (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         event_time TEXT NOT NULL,
@@ -68,14 +68,14 @@ async function ensureDatabase(env) {
         closed INTEGER NOT NULL DEFAULT 0,
         archived INTEGER NOT NULL DEFAULT 0,
         deleted_at TEXT,
-        owner_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+        owner_id TEXT REFERENCES es_accounts(id) ON DELETE SET NULL,
         fields TEXT,
         listed INTEGER NOT NULL DEFAULT 1, -- 1 = 在活动广场公开；0 = 组织者隐藏
         created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
       )`,
-      `CREATE TABLE IF NOT EXISTS signups (
+      `CREATE TABLE IF NOT EXISTS es_signups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        event_id TEXT NOT NULL REFERENCES es_events(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         phone TEXT NOT NULL,
         token TEXT NOT NULL UNIQUE,
@@ -85,14 +85,14 @@ async function ensureDatabase(env) {
         created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
         UNIQUE(event_id, phone)
       )`,
-      `CREATE INDEX IF NOT EXISTS idx_signups_event ON signups(event_id, checked_in_at)`,
-      `CREATE TABLE IF NOT EXISTS admin_sessions (
+      `CREATE INDEX IF NOT EXISTS es_idx_signups_event ON es_signups(event_id, checked_in_at)`,
+      `CREATE TABLE IF NOT EXISTS es_admin_sessions (
         token TEXT PRIMARY KEY,
-        event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        event_id TEXT NOT NULL REFERENCES es_events(id) ON DELETE CASCADE,
         created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
         expires_at TEXT NOT NULL
       )`,
-      `CREATE INDEX IF NOT EXISTS idx_admin_sessions_event ON admin_sessions(event_id, expires_at)`,
+      `CREATE INDEX IF NOT EXISTS es_idx_admin_sessions_event ON es_admin_sessions(event_id, expires_at)`,
     ];
 
     for (const sql of statements) {
@@ -101,36 +101,36 @@ async function ensureDatabase(env) {
 
     // 迁移：已存在的旧 events 表可能缺 owner_id 列，补上（幂等）
     try {
-      const cols = await env.DB.prepare("PRAGMA table_info(events)").all();
+      const cols = await env.DB.prepare("PRAGMA table_info(es_events)").all();
       const has = (cols.results || []).some(c => c.name === "owner_id");
       if (!has) {
-        await env.DB.prepare("ALTER TABLE events ADD COLUMN owner_id TEXT").run();
+        await env.DB.prepare("ALTER TABLE es_events ADD COLUMN owner_id TEXT").run();
         console.log("[middleware] 已为 events 表补加 owner_id 列");
       }
       // 迁移：补 archived / deleted_at（幂等）
       const hasArch = (cols.results || []).some(c => c.name === "archived");
       const hasDel = (cols.results || []).some(c => c.name === "deleted_at");
       if (!hasArch) {
-        await env.DB.prepare("ALTER TABLE events ADD COLUMN archived INTEGER NOT NULL DEFAULT 0").run();
+        await env.DB.prepare("ALTER TABLE es_events ADD COLUMN archived INTEGER NOT NULL DEFAULT 0").run();
         console.log("[middleware] 已为 events 表补加 archived 列");
       }
       if (!hasDel) {
-        await env.DB.prepare("ALTER TABLE events ADD COLUMN deleted_at TEXT").run();
+        await env.DB.prepare("ALTER TABLE es_events ADD COLUMN deleted_at TEXT").run();
         console.log("[middleware] 已为 events 表补加 deleted_at 列");
       }
       // 迁移：协作者表（幂等建表，旧库首次访问时创建）
       await env.DB.prepare(
-        `CREATE TABLE IF NOT EXISTS event_collaborators (
+        `CREATE TABLE IF NOT EXISTS es_event_collaborators (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-          account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+          event_id TEXT NOT NULL REFERENCES es_events(id) ON DELETE CASCADE,
+          account_id TEXT NOT NULL REFERENCES es_accounts(id) ON DELETE CASCADE,
           role TEXT NOT NULL DEFAULT 'editor',
           created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
           UNIQUE(event_id, account_id)
         )`
       ).run();
-      await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ec_event ON event_collaborators(event_id)").run();
-      await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ec_acct ON event_collaborators(account_id)").run();
+      await env.DB.prepare("CREATE INDEX IF NOT EXISTS es_idx_ec_event ON es_event_collaborators(event_id)").run();
+      await env.DB.prepare("CREATE INDEX IF NOT EXISTS es_idx_ec_acct ON es_event_collaborators(account_id)").run();
     } catch (e) {
       console.error("[middleware] owner_id 迁移失败:", e);
     }

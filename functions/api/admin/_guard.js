@@ -27,7 +27,7 @@ export async function requireAdmin(request, env, eventId) {
       return { ok: true, ev, session: null, token: null, via: "account", account: a.account, role: "owner" };
     }
     const col = await env.DB.prepare(
-      "SELECT role FROM event_collaborators WHERE event_id = ? AND account_id = ?"
+      "SELECT role FROM es_event_collaborators WHERE event_id = ? AND account_id = ?"
     ).bind(ev.id, a.account.id).first();
     if (col) {
       return { ok: true, ev, session: null, token: null, via: "collaborator", account: a.account, role: col.role };

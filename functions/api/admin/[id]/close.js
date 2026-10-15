@@ -11,7 +11,7 @@ export async function onRequestPost({ request, env, params }) {
   const body = await readJson(request);
   const closed = body && body.closed ? 1 : 0;
 
-  await env.DB.prepare("UPDATE events SET closed = ? WHERE id = ?")
+  await env.DB.prepare("UPDATE es_events SET closed = ? WHERE id = ?")
     .bind(closed, g.ev.id).run();
 
   return json({ ok: true, closed: !!closed });

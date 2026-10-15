@@ -13,6 +13,6 @@ export async function onRequestPost({ request, env, params }) {
     return json({ ok: true, restored: false, event: { id: ev.id } });
   }
 
-  await env.DB.prepare("UPDATE events SET deleted_at = NULL WHERE id = ?").bind(ev.id).run();
+  await env.DB.prepare("UPDATE es_events SET deleted_at = NULL WHERE id = ?").bind(ev.id).run();
   return json({ ok: true, restored: true, event: { id: ev.id } });
 }

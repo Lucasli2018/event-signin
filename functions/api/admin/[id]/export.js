@@ -17,7 +17,7 @@ export async function onRequestGet({ request, env, params }) {
 
   const rows = await env.DB.prepare(
     `SELECT name, phone, company, remark, checked_in_at, created_at
-     FROM signups WHERE event_id = ?
+     FROM es_signups WHERE event_id = ?
      ORDER BY created_at ASC, id ASC`
   ).bind(g.ev.id).all();
 

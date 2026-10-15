@@ -6,8 +6,8 @@ name = "event-signin"
 pages_build_output_dir = "public"
 compatibility_date = "2025-06-01"
 
-# D1 绑定（后端 env.DB）。
+# D1 绑定（后端 env.DB）。共享 dev 库，所有表带 es_ 前缀避免与其他项目冲突。
 [[d1_databases]]
 binding = "DB"
-database_name = "event-signin-db"
-database_id = "11405d6f-4f4a-4927-893b-29cbc0549478"
+database_name = "dev"
+database_id = "3c83aee3-4645-450b-b50b-6488750deeb4"

@@ -30,7 +30,7 @@ export async function onRequestPost({ request, env, params }) {
 
   // 重复报名快速提示（最终防线仍是 UNIQUE 约束）
   const dup = await env.DB.prepare(
-    "SELECT token, name FROM signups WHERE event_id = ? AND phone = ?"
+    "SELECT token, name FROM es_signups WHERE event_id = ? AND phone = ?"
   ).bind(ev.id, phone).first();
   if (dup) {
     // 幂等：同一人重复提交直接返回原签到码，方便找回
@@ -39,23 +39,23 @@ export async function onRequestPost({ request, env, params }) {
 
   // 条件占位：并发下不会超卖
   const hold = await env.DB.prepare(
-    "UPDATE events SET taken = taken + 1 WHERE id = ? AND taken < capacity AND closed = 0"
+    "UPDATE es_events SET taken = taken + 1 WHERE id = ? AND taken < capacity AND closed = 0"
   ).bind(ev.id).run();
   if (!hold.meta.changes) return fail("名额已满", 410);
 
   const token = genToken(16);
   try {
     await env.DB.prepare(
-      "INSERT INTO signups (event_id, name, phone, token, company, remark) VALUES (?, ?, ?, ?, ?, ?)"
+      "INSERT INTO es_signups (event_id, name, phone, token, company, remark) VALUES (?, ?, ?, ?, ?, ?)"
     ).bind(ev.id, name, phone, token, company || null, remark || null).run();
   } catch (err) {
     // 回退占位
     await env.DB.prepare(
-      "UPDATE events SET taken = MAX(taken - 1, 0) WHERE id = ?"
+      "UPDATE es_events SET taken = MAX(taken - 1, 0) WHERE id = ?"
     ).bind(ev.id).run();
     if (String(err).includes("UNIQUE")) {
       const again = await env.DB.prepare(
-        "SELECT token, name FROM signups WHERE event_id = ? AND phone = ?"
+        "SELECT token, name FROM es_signups WHERE event_id = ? AND phone = ?"
       ).bind(ev.id, phone).first();
       if (again) return json({ token: again.token, name: again.name, duplicated: true });
       return fail("该手机号已报名", 409);

@@ -25,11 +25,11 @@ export async function onRequestPost({ request, env, params }) {
       try { t = JSON.parse(t).t || t; } catch { /* 原样使用 */ }
     }
     signup = await env.DB.prepare(
-      "SELECT * FROM signups WHERE event_id = ? AND token = ?"
+      "SELECT * FROM es_signups WHERE event_id = ? AND token = ?"
     ).bind(g.ev.id, t).first();
   } else if (phone) {
     signup = await env.DB.prepare(
-      "SELECT * FROM signups WHERE event_id = ? AND phone = ?"
+      "SELECT * FROM es_signups WHERE event_id = ? AND phone = ?"
     ).bind(g.ev.id, phone).first();
   } else {
     return fail("缺少 token 或 phone");
@@ -43,7 +43,7 @@ export async function onRequestPost({ request, env, params }) {
 
   const now = nowFullString();
   await env.DB.prepare(
-    "UPDATE signups SET checked_in_at = ? WHERE id = ? AND checked_in_at IS NULL"
+    "UPDATE es_signups SET checked_in_at = ? WHERE id = ? AND checked_in_at IS NULL"
   ).bind(now, signup.id).run();
 
   return json({ ok: true, already_checked: false, name: signup.name, checked_in_at: now });

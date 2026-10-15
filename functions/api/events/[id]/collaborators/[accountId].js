@@ -14,7 +14,7 @@ export async function onRequestDelete({ request, env, params }) {
   if (targetId === ev.owner_id) return fail("不能移除活动创建者", 400);
 
   await env.DB.prepare(
-    "DELETE FROM event_collaborators WHERE event_id = ? AND account_id = ?"
+    "DELETE FROM es_event_collaborators WHERE event_id = ? AND account_id = ?"
   ).bind(ev.id, targetId).run();
 
   return json({ ok: true });

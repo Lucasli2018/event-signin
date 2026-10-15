@@ -6,7 +6,7 @@ import { parseCookies, clearCookie, COOKIE } from "../../_shared/account.js";
 export async function onRequestPost({ request, env }) {
   const token = parseCookies(request)[COOKIE];
   if (token) {
-    await env.DB.prepare("DELETE FROM account_sessions WHERE token = ?").bind(token).run();
+    await env.DB.prepare("DELETE FROM es_account_sessions WHERE token = ?").bind(token).run();
   }
   const res = json({ ok: true });
   res.headers.append("Set-Cookie", clearCookie());

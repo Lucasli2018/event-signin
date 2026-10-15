@@ -1,6 +1,6 @@
 -- event-signin 数据库 schema（供参考/手动建库；运行时 middleware 会自动幂等建表）
 
-CREATE TABLE IF NOT EXISTS accounts (
+CREATE TABLE IF NOT EXISTS es_accounts (
   id TEXT PRIMARY KEY,                -- 16 位随机 hex
   email TEXT NOT NULL UNIQUE,         -- 小写归一化后的邮箱
   display_name TEXT,                  -- 昵称（可选）
@@ -9,16 +9,16 @@ CREATE TABLE IF NOT EXISTS accounts (
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
 );
 
-CREATE TABLE IF NOT EXISTS account_sessions (
+CREATE TABLE IF NOT EXISTS es_account_sessions (
   token TEXT PRIMARY KEY,
-  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL REFERENCES es_accounts(id) ON DELETE CASCADE,
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
   expires_at TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_account_sessions_acct ON account_sessions(account_id, expires_at);
+CREATE INDEX IF NOT EXISTS es_idx_account_sessions_acct ON es_account_sessions(account_id, expires_at);
 
-CREATE TABLE IF NOT EXISTS events (
+CREATE TABLE IF NOT EXISTS es_events (
   id TEXT PRIMARY KEY,                -- 10 位随机 hex
   name TEXT NOT NULL,
   event_time TEXT NOT NULL,           -- 'YYYY-MM-DD HH:MM' 本地时间
@@ -32,15 +32,15 @@ CREATE TABLE IF NOT EXISTS events (
   closed INTEGER NOT NULL DEFAULT 0,  -- 1 = 停止报名
   archived INTEGER NOT NULL DEFAULT 0, -- 1 = 已归档（保留数据但隐藏在活跃列表）
   deleted_at TEXT,                    -- 软删除时间，NULL = 未删
-  owner_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,  -- 账号系统：所属组织者（旧活动为 NULL）
+  owner_id TEXT REFERENCES es_accounts(id) ON DELETE SET NULL,  -- 账号系统：所属组织者（旧活动为 NULL）
   fields TEXT,                      -- 报名自定义字段定义（JSON: {"company":bool,"remark":bool}）
   listed INTEGER NOT NULL DEFAULT 1, -- 1 = 在活动广场公开；0 = 组织者隐藏
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
 );
 
-CREATE TABLE IF NOT EXISTS signups (
+CREATE TABLE IF NOT EXISTS es_signups (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  event_id TEXT NOT NULL REFERENCES es_events(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   phone TEXT NOT NULL,
   token TEXT NOT NULL UNIQUE,         -- 签到码内容（16 字节 hex）
@@ -51,26 +51,26 @@ CREATE TABLE IF NOT EXISTS signups (
   UNIQUE(event_id, phone)             -- 同活动同手机号防重复报名
 );
 
-CREATE INDEX IF NOT EXISTS idx_signups_event ON signups(event_id, checked_in_at);
+CREATE INDEX IF NOT EXISTS es_idx_signups_event ON es_signups(event_id, checked_in_at);
 
-CREATE TABLE IF NOT EXISTS admin_sessions (
+CREATE TABLE IF NOT EXISTS es_admin_sessions (
   token TEXT PRIMARY KEY,
-  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  event_id TEXT NOT NULL REFERENCES es_events(id) ON DELETE CASCADE,
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
   expires_at TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_admin_sessions_event ON admin_sessions(event_id, expires_at);
+CREATE INDEX IF NOT EXISTS es_idx_admin_sessions_event ON es_admin_sessions(event_id, expires_at);
 
 -- 活动协作者（多人协同管理）
-CREATE TABLE IF NOT EXISTS event_collaborators (
+CREATE TABLE IF NOT EXISTS es_event_collaborators (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  event_id TEXT NOT NULL REFERENCES es_events(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL REFERENCES es_accounts(id) ON DELETE CASCADE,
   role TEXT NOT NULL DEFAULT 'editor',  -- editor | admin（目前均具管理权限）
   created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
   UNIQUE(event_id, account_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_ec_event ON event_collaborators(event_id);
-CREATE INDEX IF NOT EXISTS idx_ec_acct ON event_collaborators(account_id);
+CREATE INDEX IF NOT EXISTS es_idx_ec_event ON es_event_collaborators(event_id);
+CREATE INDEX IF NOT EXISTS es_idx_ec_acct ON es_event_collaborators(account_id);

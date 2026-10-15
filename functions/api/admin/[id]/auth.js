@@ -50,11 +50,11 @@ export async function onRequestPost({ request, env, params }) {
   const expiresStr = expires.toISOString().slice(0, 19).replace("T", " ");
 
   await env.DB.prepare(
-    "INSERT INTO admin_sessions (token, event_id, created_at, expires_at) VALUES (?, ?, ?, ?)"
+    "INSERT INTO es_admin_sessions (token, event_id, created_at, expires_at) VALUES (?, ?, ?, ?)"
   ).bind(token, ev.id, now, expiresStr).run();
 
   // 顺手清理过期 session
-  await env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at < ?").bind(now).run();
+  await env.DB.prepare("DELETE FROM es_admin_sessions WHERE expires_at < ?").bind(now).run();
 
   return json({
     token,

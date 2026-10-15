@@ -61,7 +61,7 @@ export async function onRequestGet({ request, env }) {
   let total = 0;
   try {
     const c = await env.DB.prepare(
-      `SELECT COUNT(*) AS c FROM events e WHERE ${whereSql}`
+      `SELECT COUNT(*) AS c FROM es_events e WHERE ${whereSql}`
     ).bind(...binds).first();
     total = (c && c.c) || 0;
   } catch (e) {
@@ -73,8 +73,8 @@ export async function onRequestGet({ request, env }) {
   const rows = await env.DB.prepare(
     `SELECT e.id, e.name, e.event_time, e.location, e.description,
             e.capacity, e.taken, e.closed, e.created_at, a.display_name AS organizer
-     FROM events e
-     LEFT JOIN accounts a ON e.owner_id = a.id
+     FROM es_events e
+     LEFT JOIN es_accounts a ON e.owner_id = a.id
      WHERE ${whereSql}
      ORDER BY ${orderBy}
      LIMIT ? OFFSET ?`

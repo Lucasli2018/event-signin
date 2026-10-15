@@ -61,7 +61,7 @@ export async function onRequestPut({ request, env, params }) {
   if (description.length > 500) return fail("简介最长 500 字");
 
   await env.DB.prepare(
-    `UPDATE events SET name=?, event_time=?, location=?, description=?, capacity=?, archived=?, listed=?, fields=? WHERE id=?`
+    `UPDATE es_events SET name=?, event_time=?, location=?, description=?, capacity=?, archived=?, listed=?, fields=? WHERE id=?`
   ).bind(name, eventTime, location || null, description || null, capacityRaw, archived, listed, fieldsJson, ev.id).run();
 
   return json({
@@ -79,7 +79,7 @@ export async function onRequestPut({ request, env, params }) {
 export async function onRequestDelete({ request, env, params }) {
   const g = await requireAdmin(request, env, params.id);
   if (!g.ok) return g.response;
-  await env.DB.prepare("UPDATE events SET deleted_at = ? WHERE id = ?")
+  await env.DB.prepare("UPDATE es_events SET deleted_at = ? WHERE id = ?")
     .bind(nowFullString(), g.ev.id).run();
   return json({ ok: true });
 }

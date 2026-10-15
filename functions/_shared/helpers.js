@@ -22,13 +22,13 @@ export async function readJson(request) {
 // ============ 活动查询 ============
 export async function getEvent(env, eventId) {
   if (!eventId || typeof eventId !== "string") return null;
-  return env.DB.prepare("SELECT * FROM events WHERE id = ? AND deleted_at IS NULL").bind(eventId).first();
+  return env.DB.prepare("SELECT * FROM es_events WHERE id = ? AND deleted_at IS NULL").bind(eventId).first();
 }
 
 // 不过滤软删除，供管理端查看/恢复已删活动
 export async function getEventRaw(env, eventId) {
   if (!eventId || typeof eventId !== "string") return null;
-  return env.DB.prepare("SELECT * FROM events WHERE id = ?").bind(eventId).first();
+  return env.DB.prepare("SELECT * FROM es_events WHERE id = ?").bind(eventId).first();
 }
 
 // ============ Session 校验 ============
@@ -46,14 +46,14 @@ export async function requireSession(env, request, eventId) {
   if (!token) return { error: "未登录", status: 401 };
 
   const session = await env.DB.prepare(
-    "SELECT * FROM admin_sessions WHERE token = ?"
+    "SELECT * FROM es_admin_sessions WHERE token = ?"
   ).bind(token).first();
 
   if (!session) return { error: "会话无效", status: 401 };
 
   const now = nowLocalString();
   if (session.expires_at < now) {
-    await env.DB.prepare("DELETE FROM admin_sessions WHERE token = ?").bind(token).run();
+    await env.DB.prepare("DELETE FROM es_admin_sessions WHERE token = ?").bind(token).run();
     return { error: "会话已过期", status: 401 };
   }
 

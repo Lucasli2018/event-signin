@@ -357,9 +357,9 @@ console.log("\n[A] 账号系统（注册/登录/免 PIN 管理）");
       const dbs = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/d1/database`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
       const db = dbs.result.find(d => d.name === "event-signin-db");
       const q = sql => fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/d1/database/${db.uuid}/query`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ sql }) }).then(r => r.json());
-      const a2 = await q(`SELECT id FROM accounts WHERE email='${email2}'`);
+      const a2 = await q(`SELECT id FROM es_accounts WHERE email='${email2}'`);
       const a2id = a2.result?.[0]?.results?.[0]?.id;
-      if (a2id) { await q(`DELETE FROM account_sessions WHERE account_id='${a2id}'`); await q(`DELETE FROM accounts WHERE id='${a2id}'`); }
+      if (a2id) { await q(`DELETE FROM es_account_sessions WHERE account_id='${a2id}'`); await q(`DELETE FROM es_accounts WHERE id='${a2id}'`); }
       ck("协作账号2已清理", true);
     } catch (e) { console.log(`  账号2清理失败: ${e.message}`); }
   } else { console.log(`  协作账号2 ${email2} 未清理（无令牌）`); }
@@ -386,12 +386,12 @@ console.log("\n[A] 账号系统（注册/登录/免 PIN 管理）");
       const q = sql => fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/d1/database/${db.uuid}/query`, {
         method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ sql }),
       }).then(r => r.json());
-      const acc = await q(`SELECT id FROM accounts WHERE email='${email}'`);
+      const acc = await q(`SELECT id FROM es_accounts WHERE email='${email}'`);
       const accId = acc.result?.[0]?.results?.[0]?.id;
       if (accId) {
-        await q(`DELETE FROM account_sessions WHERE account_id='${accId}'`);
-        await q(`DELETE FROM events WHERE owner_id='${accId}'`);
-        await q(`DELETE FROM accounts WHERE id='${accId}'`);
+        await q(`DELETE FROM es_account_sessions WHERE account_id='${accId}'`);
+        await q(`DELETE FROM es_events WHERE owner_id='${accId}'`);
+        await q(`DELETE FROM es_accounts WHERE id='${accId}'`);
       }
       ck("账号测试数据已清理", true);
     } catch (e) { console.log(`  账号清理失败: ${e.message}`); }
@@ -463,10 +463,10 @@ if (process.env.TOKEN_FILE || process.env.CLOUDFLARE_API_TOKEN) {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ sql }),
     }).then(r => r.json());
-    await q(`DELETE FROM signups WHERE event_id = '${eventId}'`);
-    await q(`DELETE FROM admin_sessions WHERE event_id = '${eventId}'`);
-    await q(`DELETE FROM events WHERE id = '${eventId}'`);
-    const v = await q(`SELECT COUNT(*) AS n FROM events WHERE id = '${eventId}'`);
+    await q(`DELETE FROM es_signups WHERE event_id = '${eventId}'`);
+    await q(`DELETE FROM es_admin_sessions WHERE event_id = '${eventId}'`);
+    await q(`DELETE FROM es_events WHERE id = '${eventId}'`);
+    const v = await q(`SELECT COUNT(*) AS n FROM es_events WHERE id = '${eventId}'`);
     ck("测试活动已清除", v.result?.[0]?.results?.[0]?.n === 0, JSON.stringify(v.result?.[0]?.results));
   } catch (e) {
     console.log(`  清理失败（不影响功能）: ${e.message}`);
